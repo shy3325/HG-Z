@@ -1805,12 +1805,11 @@ const EMPRESS_DOWAGER_PERSONALITIES = ['擅权','避世','中立'];
 
 const CHILD_PERSONALITIES = ['内向','外向','沉稳','活泼','敏感','好胜','温厚','叛逆','机敏','憨厚','早慧','顽劣','恭谨','骄纵','淡然','执拗','聪慧','鲁莽','细腻','洒脱'];
 
-const TALENT_NAMES = ['音律','书画','舞艺','学识','刺绣'];
+const TALENT_NAMES = ['音律','书画','舞艺','刺绣'];
 const TALENT_ACTIONS = {
   '音律':{learn:'抚琴',practice:'习曲'},
   '书画':{learn:'临摹',practice:'挥毫',create:'绘画'},
   '舞艺':{learn:'练步',practice:'排舞'},
-  '学识':{learn:'研读',practice:'参悟'},
   '刺绣':{learn:'穿针',practice:'绣花',create:'绣制'},
 };
 
@@ -2291,6 +2290,7 @@ let GS = {
     selectionCount:'medium',
     allowPlotConcubines:false,
     conflictFrequency:'medium',
+    interactionFrequency:'medium',
     allowAffairs:true,
   },
   creationProgress: null,
@@ -2535,6 +2535,7 @@ function generateNPC(type,forcedRank,forcedGender){
     dickSize:(gender==='male'||gender==='bisexual')?rand(10,30):0,
     fertility:rand(20,80),
     scheming:rand(50,500),
+    knowledge:type==='emperor'?rand(700,1000):rand(0,1000),
     inclination:rand(0,100),
     network:rand(20,200),
     experience:0,
@@ -2648,7 +2649,7 @@ function generateDoctor(){
   };
   initSexRecord(doc.id);
   TALENT_NAMES.forEach(t=>{doc.discovered.talents[t]=true;doc.talents[t]=rand(0,30);});
-  doc.talents['学识']=rand(50,90);
+  doc.knowledge=rand(400,800);
   return doc;
 }
 
@@ -2709,7 +2710,7 @@ function nextAvatar(){let pool=getAvatarPool();currentAvatarIndex=(currentAvatar
 
 function initCreation(){
   updateAvatarPreview();
-  creationStats={age:rand(14,18),lifespan:rand(50,88),charm:rand(0,600),constitution:rand(0,600),dickSize:rand(10,30),scheming:rand(0,300)};
+  creationStats={age:rand(14,18),lifespan:rand(50,88),charm:rand(0,600),constitution:rand(0,600),dickSize:rand(10,30),scheming:rand(0,300),knowledge:rand(0,600)};
   creationTalents={};
   TALENT_NAMES.forEach(t=>{creationTalents[t]=rand(0,20);});
   renderCreationStats();
@@ -2717,8 +2718,8 @@ function initCreation(){
 }
 
 function renderCreationStats(){
-  const labels={age:'年龄',lifespan:'寿元',charm:'魅力',constitution:'体质',dickSize:'尺寸(cm)',scheming:'心机'};
-  const ranges={age:[14,18],lifespan:[50,88],charm:[0,600],constitution:[0,600],dickSize:[10,30],scheming:[0,300]};
+  const labels={age:'年龄',lifespan:'寿元',charm:'魅力',constitution:'体质',dickSize:'尺寸(cm)',scheming:'心机',knowledge:'学识'};
+  const ranges={age:[14,18],lifespan:[50,88],charm:[0,600],constitution:[0,600],dickSize:[10,30],scheming:[0,300],knowledge:[0,600]};
   let html='';
   for(let key in labels){
     html+=`<div class="stat-row"><span class="stat-name">${labels[key]}</span><span class="stat-value" id="stat-${key}">${creationStats[key]}</span><button class="dice-btn" onclick="rerollStat('${key}',${ranges[key][0]},${ranges[key][1]})">🎲</button></div>`;
@@ -2762,6 +2763,7 @@ function startGame(){
     gender:currentGender,age:creationStats.age,lifespan:creationStats.lifespan,rank:playerRank,
     avatar:playerAvatar,talents:{...creationTalents},charm:creationStats.charm,
     constitution:creationStats.constitution,dickSize:playerDickSize,scheming:creationStats.scheming,
+    knowledge:creationStats.knowledge,
     network:50,experience:0,hobby:pick(TALENT_NAMES),alive:true,inColdPalace:false,
     pregnant:false,pregnantMonth:0,children:[],canBear:true,servants:[],personality:'—',traits:[],
     virginity:initVirginity({gender:currentGender}),sexExperience:0,
@@ -2869,7 +2871,8 @@ function renderPalace(){
       <div class="palace-stat-item"><span class="palace-stat-label">体质</span><span class="palace-stat-val">${p.constitution}/1000</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">尺寸</span><span class="palace-stat-val">${p.dickSize}cm</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">心机</span><span class="palace-stat-val">${p.scheming}</span></div>
-      <div class="palace-stat-item"><span class="palace-stat-label">人脉</span><span class="palace-stat-val">${p.network}</span></div>
+      <div class="palace-stat-item"><span class="palace-stat-label">学识</span><span class="palace-stat-val">${p.knowledge||0}/1000</span></div>
+      <div class="palace-stat-item"><span class="palace-stat-label">人脉</span><span class="palace-stat-val">${p.network}/1000</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">资历</span><span class="palace-stat-val">${p.experience||0}/${p.expCap||100}</span></div>
     </div>
     <div class="palace-stat-item" style="border-top:1px solid rgba(180,150,100,0.2);padding-top:6px;margin-top:4px;"><span class="palace-stat-label">宠爱</span><span class="palace-stat-val" style="color:${lt.color}">${lt.text}（${playerLove}）</span></div>
@@ -3005,7 +3008,14 @@ function doTalentAction(talent,action){
     GS.player.talents[talent]=clamp(GS.player.talents[talent]+gain,0,100);
     let actionName=TALENT_ACTIONS[talent][action];
     let texts=[`凝神${actionName}，若有所悟，${talent}精进了。`,`潜心${actionName}，渐入佳境。`,`专注${actionName}，技法愈发纯熟。`,`用心${actionName}，功力渐长。`];
-    showToast(pick(texts));updateTopBar();renderPalace();
+    let msg=pick(texts);
+    // 更改6：30%概率增加学识
+    if(Math.random()<0.3){
+      let knowledgeGain=rand(3,5);
+      GS.player.knowledge=clamp((GS.player.knowledge||0)+knowledgeGain,0,1000);
+      msg+=` 学识+${knowledgeGain}`;
+    }
+    showToast(msg);updateTopBar();renderPalace();
   });
 }
 
@@ -3062,8 +3072,30 @@ function useItem(index){
   let item=GS.inventory[index];if(!item)return;
   let targets=getAllNPCs().filter(n=>n.alive&&n.type!=='player');
   let html=`<div class="modal-title">选择目标使用「${item.name}」</div><button class="modal-close" onclick="closeModal()">✕</button>`;
+  // 用户自己也可以使用（仅限good类型药物）
+  if(item.type==='good'){
+    html+=`<button class="modal-btn" style="border:2px solid #d4af37" onclick="applyItemToSelf(${index})">自己服用</button>`;
+  }
   targets.forEach(t=>{html+=`<button class="modal-btn" onclick="applyItem(${index},'${t.id}')">${t.surname}${t.rank||''}</button>`;});
   openModal(html);
+}
+
+function applyItemToSelf(index){
+  let item=GS.inventory[index];if(!item)return;
+  let eff=item.effect;let msg='';
+  if(item.type==='good'){
+    if(eff.constitution){let gain=rand(eff.constitution[0],eff.constitution[1]);GS.player.constitution=clamp(GS.player.constitution+gain,0,1000);msg=`服用「${item.name}」，体质增加${gain}。`;}
+    if(eff.fertilityAdd){let gain=rand(eff.fertilityAdd[0],eff.fertilityAdd[1]);msg=`服用「${item.name}」，孕率提升。`;}
+    if(eff.charmAdd){let gain=rand(eff.charmAdd[0],eff.charmAdd[1]);GS.player.charm=clamp(GS.player.charm+gain,0,1000);msg=`服用「${item.name}」，容颜更胜从前。`;}
+    if(!msg)msg=`服用了「${item.name}」。`;
+  }else if(item.type==='poison'){
+    if(eff.charm){GS.player.charm=clamp(GS.player.charm+eff.charm,0,1000);msg=`服用「${item.name}」……你的容貌大损！`;}
+    if(eff.fertility===0){GS.player.canBear=false;msg=`服用「${item.name}」……此后再无生育之望。`;}
+    if(eff.lethal){GS.player.alive=false;msg=`「${item.name}」药效发作……你毒发身亡。`;}
+    if(eff.miscarriage&&GS.player.pregnant){GS.player.pregnant=false;GS.player.pregnantMonth=0;GS.player.pregnantFather=null;msg=`服用「${item.name}」……你流产了。`;}
+    if(!msg)msg=`服用了「${item.name}」，似乎不太妙……`;
+  }
+  GS.inventory.splice(index,1);showToast(msg);updateTopBar();closeModal();
 }
 
 function applyItem(index,targetId){
@@ -3200,6 +3232,8 @@ function emperorPalacePerformTalent(){
   let bestTalent='';let bestVal=0;
   TALENT_NAMES.forEach(t=>{if(GS.player.talents[t]>bestVal){bestVal=GS.player.talents[t];bestTalent=t;}});
   let gain=bestVal>60?rand(3,6):rand(1,3);
+  let perfPrefBonus=getEmperorPreferenceBonus(GS.player);
+  gain+=perfPrefBonus;
   GS.emperor.favor=clamp(GS.emperor.favor+gain,-100,100);
   let texts=[
     `你在御前献上一段${bestTalent}表演，皇帝颔首微笑，龙颜稍悦。`,
@@ -3222,7 +3256,10 @@ function emperorPalacePraise(){
 function doPraise(id){
   GS.emperorVisitedThisMonth=true;
   let npc=findNPC(id);if(!npc)return;
-  npc.love=clamp((npc.love||0)+rand(3,8),0,100);
+  let praisePrefBonus=getEmperorPreferenceBonus(npc);
+  npc.love=clamp((npc.love||0)+rand(3,8)+praisePrefBonus,0,100);
+  let hasFPPraise=npc.traits?.find(t=>t.effect&&t.effect.foreignPower);
+  if(hasFPPraise)npc.love=Math.min(npc.love,50);
   showToast(`你在皇帝面前为${getNPCDisplayName(npc)}美言，其圣宠增加。`);
   addNpcLog('player',`在皇帝面前为${getNPCDisplayName(npc)}美言`);
   // 冷宫释放：如果该妃子在冷宫且圣宠变为正数
@@ -3261,6 +3298,10 @@ function doSlander(id){
 function emperorPalaceDaylightSex(){
   if(GS.emperor.favor<40){showToast('皇帝对你并无此意。');return;}
   GS.emperorVisitedThisMonth=true;
+  let daylightPrefBonus=getEmperorPreferenceBonus(GS.player);
+  if(daylightPrefBonus!==0){
+    GS.emperor.favor=clamp(GS.emperor.favor+daylightPrefBonus,-100,100);
+  }
   triggerBedScene(GS.emperor,false);
 }
 
@@ -3590,7 +3631,8 @@ function showNPCDetailReadonly(id){
     <div class="npc-stat-item"><span class="npc-stat-label">孕率</span><span class="${showAll||npc.discovered?.fertility?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.fertility?npc.fertility+'%':'???'}</span></div>
     <div class="npc-stat-item"><span class="npc-stat-label">心机</span><span class="${showAll||npc.discovered?.scheming?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.scheming?npc.scheming:'???'}</span></div>
     <div class="npc-stat-item"><span class="npc-stat-label">倾向</span><span class="${showAll||npc.discovered?.inclination?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.inclination?npc.inclination:'???'}</span></div>
-    <div class="npc-stat-item"><span class="npc-stat-label">爱好</span><span class="${showAll||npc.discovered?.hobby?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.hobby?npc.hobby:'???'}</span></div>`;
+    <div class="npc-stat-item"><span class="npc-stat-label">爱好</span><span class="${showAll||npc.discovered?.hobby?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.hobby?npc.hobby:'???'}</span></div>
+    <div class="npc-stat-item"><span class="npc-stat-label">学识</span><span class="npc-stat-val">${npc.knowledge||0}/1000</span></div>`;
   if(npc.dickSize>0) html+=`<div class="npc-stat-item"><span class="npc-stat-label">尺寸</span><span class="npc-stat-val">${npc.dickSize}cm</span></div>`;
   // 太医也显示孕率
   if(isDoctor) html+=`<div class="npc-stat-item"><span class="npc-stat-label">孕率</span><span class="npc-stat-val">${npc.fertility||0}%</span></div>`;
@@ -3617,7 +3659,14 @@ function showNPCDetailReadonly(id){
 
   // 皇帝心情
   if(isEmperor){
+    let prefDesc='';
+    if(npc.personality==='风流')prefDesc='偏好：美人（魅力高者获额外圣宠）';
+    else if(npc.personality==='骚浪')prefDesc='偏好：巨物（尺寸大者获额外圣宠）';
+    else if(npc.personality==='正直')prefDesc='偏好：才学（学识高者获额外圣宠）';
+    else if(npc.personality==='腹黑')prefDesc='偏好：心机（心机高者获额外圣宠）';
+    else if(npc.personality==='温柔')prefDesc='偏好：一视同仁（无特殊偏好）';
     html+=`<div style="margin:6px 0;font-size:11px;color:#6b4c30;border-top:1px solid rgba(180,150,100,0.2);padding-top:4px">心情：<span style="color:${GS.emperorMood>50?'#4caf50':'#f44336'};font-weight:bold">${GS.emperorMood}</span></div>`;
+    html+=`<div style="font-size:10px;color:#8b6914;margin:2px 0">${prefDesc}</div>`;
   }
 
   // 才艺（皇帝太后太医不显示）
@@ -3658,6 +3707,17 @@ function showNPCDetailReadonly(id){
     });
   }
 
+  // 已故标记与死因
+  if(!npc.alive){
+    let deathLogs=(GS.npcHistoryLog[npc.id]||[]).filter(l=>l.text.includes('身亡')||l.text.includes('离世')||l.text.includes('长逝')||l.text.includes('处死')||l.text.includes('赐死')||l.text.includes('中毒')||l.text.includes('难产'));
+    let deathCause=deathLogs.length>0?deathLogs[deathLogs.length-1].text:'不详';
+    html+=`<div style="margin:8px 0;padding:8px;background:rgba(0,0,0,0.06);border-radius:6px;border:1px solid rgba(153,153,153,0.3)">
+      <div style="font-size:12px;color:#999;font-weight:bold;margin-bottom:4px">⚰ 已故</div>
+      <div style="font-size:11px;color:#666">死因：${deathCause}</div>
+      <div style="font-size:10px;color:#999;margin-top:4px">生于${GS.date.era}历，享年${npc.age}岁</div>
+    </div>`;
+  }
+  
   // 关系网
   if(!isEmperor&&!isED&&!isDoctor){
     let relations=[];
@@ -3979,22 +4039,91 @@ function chatTalent(id,talent){
     updateTopBar();renderNPCChat(id);
   });
 }
+function chatGift(id){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  let npc=findNPC(id);if(!npc)return;
+  let giftable=GS.inventory.filter(i=>i.type==='artwork'||i.type==='good');
+  if(giftable.length===0){showToast('仓库中没有可赠送的物品');return;}
+  let html=`<div class="modal-title">赠予${npc.surname}${npc.rank||npc.fullName}</div><button class="modal-close" onclick="closeModal()">✕</button>`;
+  giftable.forEach((item)=>{
+    let origIdx=GS.inventory.indexOf(item);
+    html+=`<button class="modal-btn" onclick="doGiftNPC('${id}',${origIdx})">${item.name}（${item.type==='artwork'?'作品':'药物'}）</button>`;
+  });
+  openModal(html);
+}
+
+function doGiftNPC(id,itemIdx){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  GS.stamina--;updateTopBar();
+  let npc=findNPC(id);let item=GS.inventory[itemIdx];
+  if(!npc||!item)return;
+  showActionProgress(()=>{
+    let favorGain=0;
+    if(item.type==='artwork'){
+      let tierBonus={grey:2,green:4,blue:6,purple:10,red:15};
+      favorGain=tierBonus[item.tier]||3;
+    }else if(item.type==='good'){
+      favorGain=rand(3,8);
+      let eff=item.effect;
+      if(eff){
+        if(eff.constitution){let gain=rand(eff.constitution[0],eff.constitution[1]);npc.constitution=clamp(npc.constitution+gain,0,1000);}
+        if(eff.fertilityAdd){let gain=rand(eff.fertilityAdd[0],eff.fertilityAdd[1]);npc.fertility=clamp(npc.fertility+gain,0,100);}
+        if(eff.charmAdd){let gain=rand(eff.charmAdd[0],eff.charmAdd[1]);npc.charm=clamp(npc.charm+gain,0,1000);}
+      }
+    }
+    npc.favor=clamp(npc.favor+favorGain,-100,100);
+    GS.inventory.splice(itemIdx,1);
+    showToast(`赠予${npc.surname}${npc.rank||''}「${item.name}」，好感+${favorGain}`);
+    closeModal();
+  });
+}
 function chatTalk(id){
   if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
   GS.stamina--;updateTopBar();
   showActionProgress(()=>{
     let npc=findNPC(id);if(!npc)return;
     npc.favor=clamp(npc.favor+rand(1,3),-100,100);
-    if(!npc.discovered)npc.discovered={};
+    if(!npc.discovered)npc.discovered={personality:false,hobby:false,charm:false,constitution:false,fertility:false,scheming:false,inclination:false,talents:{}};
     npc.discovered.personality=true;
+
+    // 更改5：交谈随机解锁对方未发现的属性
+    let undiscoveredAttrs=[];
+    if(!npc.discovered.hobby)undiscoveredAttrs.push('hobby');
+    if(!npc.discovered.charm)undiscoveredAttrs.push('charm');
+    if(!npc.discovered.constitution)undiscoveredAttrs.push('constitution');
+    if(!npc.discovered.fertility)undiscoveredAttrs.push('fertility');
+    if(!npc.discovered.scheming)undiscoveredAttrs.push('scheming');
+    if(!npc.discovered.inclination)undiscoveredAttrs.push('inclination');
+    TALENT_NAMES.forEach(t=>{if(!npc.discovered.talents)npc.discovered.talents={};if(!npc.discovered.talents[t])undiscoveredAttrs.push('talent_'+t);});
+    let discoverMsg='';
+    if(undiscoveredAttrs.length>0&&Math.random()<0.4){
+      let toDiscover=pick(undiscoveredAttrs);
+      let attrLabels={hobby:'爱好',charm:'魅力',constitution:'体质',fertility:'孕率',scheming:'心机',inclination:'倾向'};
+      if(toDiscover.startsWith('talent_')){
+        let tName=toDiscover.replace('talent_','');
+        npc.discovered.talents[tName]=true;
+        discoverMsg=`（你在交谈中得知了对方的${tName}水平）`;
+      }else{
+        npc.discovered[toDiscover]=true;
+        let label=attrLabels[toDiscover]||toDiscover;
+        if(toDiscover==='hobby'){
+          discoverMsg=`（你在交谈中发现对方喜好${npc.hobby}）`;
+        }else{
+          discoverMsg=`（你在交谈中了解到对方的${label}情况）`;
+        }
+      }
+    }
+
     let chatLog=GS.chatHistory[id]||[];
     let pKey=npc.personality;
     let dialogueSet=CHAT_DIALOGUES[pKey]||CHAT_DIALOGUES.default;
     chatLog.push({speaker:GS.player.fullName,text:'（闲聊）',isPlayer:true});
     chatLog.push({speaker:npc.fullName,text:pick(dialogueSet.talk),isPlayer:false});
+    if(discoverMsg)chatLog.push({speaker:'旁白',text:discoverMsg,isPlayer:false});
     let bonusTalk=0;
     GS.player.servants.forEach(s=>{let tb=s.trait.talkBonus||0;bonusTalk+=tb;});
     npc.favor=clamp(npc.favor+bonusTalk,-100,100);
+    if(discoverMsg)showToast(discoverMsg);
     updateTopBar();renderNPCChat(id);
   });
 }
@@ -4186,6 +4315,7 @@ function triggerBedScene(npc,forced){
 function renderEmperorBedScene(emperor){
   let satisfaction=50;
   const personality=emperor.personality;
+  let playerCall=getPlayerCallName();
   let dialogues;
 
   if(personality==='正直'){
@@ -4289,7 +4419,21 @@ function renderBedDialogue(){
   if(data.step>=data.dialogues.length){finishEmperorBed();return;}
   let d=data.dialogues[data.step];
   let bdView=document.getElementById('bedchamber-view');
-  let html=`<div class="bedchamber-overlay"></div><div class="bedchamber-content"><div style="text-align:center;margin-bottom:16px"><img src="${data.npc.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover"></div><div class="dialogue-box"><div class="dialogue-speaker">${d.speaker}</div><div class="dialogue-text">${d.text}</div><div class="dialogue-choices">`;
+  let displayText=d.text;
+  // 更改8：皇帝称呼玩家名/昵称
+  if(data.npc.type==='emperor'){
+    let callName=getPlayerCallName();
+    displayText=displayText.replace(/你/g,callName).replace(new RegExp(callName+callName,'g'),callName);
+    // 避免过度替换导致不通顺，仅替换第一个"你"为称呼
+    displayText=d.text;// 回退，改用更精确的方式
+    if(GS.emperor&&GS.emperor.favor>=60&&GS.player.nickname){
+      // 在对话开头加上称呼
+      if(!displayText.startsWith(GS.player.nickname)){
+        displayText=GS.player.nickname+'，'+displayText;
+      }
+    }
+  }
+  let html=`<div class="bedchamber-overlay"></div><div class="bedchamber-content"><div style="text-align:center;margin-bottom:16px"><img src="${data.npc.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover"></div><div class="dialogue-box"><div class="dialogue-speaker">${d.speaker}</div><div class="dialogue-text">${displayText}</div><div class="dialogue-choices">`;
   d.choices.forEach((c,i)=>{html+=`<button class="dialogue-choice-btn" onclick="chooseBedOption(${i})">${c.text}</button>`;});
   html+=`</div></div></div>`;bdView.innerHTML=html;
 }
@@ -4310,6 +4454,9 @@ function finishEmperorBed(){
   else if(satisfaction>=70){loveGain=rand(5,10);}
   else if(satisfaction>=50){loveGain=rand(2,5);}
   else loveGain=rand(-2,2);
+
+  let prefBonus=getEmperorPreferenceBonus(GS.player);
+  loveGain+=prefBonus;
 
   data.npc.favor=clamp(data.npc.favor+loveGain,-100,100);
   GS.player.experience+=expGain*expMul;
@@ -4587,7 +4734,10 @@ function emperorSelectBedPartner(){
     GS._bribeBonus=0;// 被选中后清除贿赂加成
     return{selected:'player',playerChance,selectedName:'你'};
   }else{
-    selected.love=clamp((selected.love||0)+rand(2,5),0,100);
+    let npcBedPrefBonus=getEmperorPreferenceBonus(selected);
+    selected.love=clamp((selected.love||0)+rand(2,5)+npcBedPrefBonus,0,100);
+    let hasFPCheck=selected.traits?.find(t=>t.effect&&t.effect.foreignPower);
+    if(hasFPCheck)selected.love=Math.min(selected.love,50);
     // 记录皇帝侍寝的洞和贞操
     let holes=[];
     if(selected.gender==='female'){holes=['front','back'];}
@@ -4661,6 +4811,15 @@ function advanceXun(){
       checkNPCPromotion(c);
     }
   });
+
+  // 皇帝性格偏好：每旬对所有活着的妃子微调圣宠
+  GS.concubines.forEach(c=>{
+    if(c.alive&&!c.inColdPalace){
+      applyEmperorPreferenceToNPC(c);
+    }
+  });
+  // 对玩家也应用
+  applyEmperorPreferenceToPlayer();
 
   // NPC之间互动
   processNPCInteractions();
@@ -4780,10 +4939,78 @@ function getNPCDisplayName(npc){
   return npc.surname+npc.rank;
 }
 
+function getPlayerCallName(){
+  if(GS.emperor&&GS.emperor.favor>=60&&GS.player.nickname){
+    return GS.player.nickname;
+  }
+  return GS.player.fullName;
+}
+
+function getEmperorPreferenceBonus(targetNpc){
+  if(!GS.emperor)return 0;
+  let personality=GS.emperor.personality;
+  let bonus=0;
+  if(personality==='温柔')return 0;
+  if(personality==='风流'){
+    let charm=targetNpc.charm||0;
+    if(charm>=600)bonus=rand(1,3);
+    else if(charm<300)bonus=-rand(1,3);
+  }else if(personality==='骚浪'){
+    let dickSize=targetNpc.dickSize||0;
+    if(dickSize>=23)bonus=rand(1,3);
+    else if(dickSize<16)bonus=-rand(1,3);
+  }else if(personality==='正直'){
+    let knowledge=targetNpc.knowledge||0;
+    if(knowledge>=600)bonus=rand(1,3);
+    else if(knowledge<300)bonus=-rand(1,3);
+  }else if(personality==='腹黑'){
+    let scheming=targetNpc.scheming||0;
+    if(scheming>=600)bonus=rand(1,3);
+    else if(scheming<300)bonus=-rand(1,3);
+  }
+  return bonus;
+}
+
+function applyEmperorPreferenceToPlayer(){
+  if(!GS.emperor)return;
+  let bonus=getEmperorPreferenceBonus(GS.player);
+  if(bonus!==0){
+    GS.emperor.favor=clamp(GS.emperor.favor+bonus,-100,100);
+  }
+}
+
+function applyEmperorPreferenceToNPC(npc){
+  if(!GS.emperor||!npc)return;
+  let bonus=getEmperorPreferenceBonus(npc);
+  if(bonus!==0){
+    npc.love=clamp((npc.love||0)+bonus,0,100);
+    let hasFP=npc.traits?.find(t=>t.effect&&t.effect.foreignPower);
+    if(hasFP)npc.love=Math.min(npc.love,50);
+  }
+}
+
 function processNPCAffairs(){
-  if(!GS.settings.allowAffairs)return;
   let aliveC=GS.concubines.filter(c=>c.alive&&!c.inColdPalace);
+  let interFreq=GS.settings.interactionFrequency||'medium';
+  let interChance=interFreq==='low'?0.08:(interFreq==='high'?0.30:0.18);
+  let affairAllowed=GS.settings.allowAffairs;
+
   aliveC.forEach(c=>{
+    // 正面互动（交友、好感增长）——不受对食开关影响
+    if(Math.random()<interChance){
+      let partner=pick(aliveC.filter(x=>x.id!==c.id));
+      if(partner){
+        let rel=getNpcRelation(c.id,partner.id);
+        let gain=rand(2,6);
+        // 如果对食关闭，好感上限60（仅友谊）
+        let capVal=affairAllowed?100:60;
+        setNpcRelation(c.id,partner.id,clamp(rel+gain,-100,capVal));
+      }
+    }
+
+    // 偷情/恋爱行为——仅在对食开启时触发
+    if(!affairAllowed)return;
+
     let isEasyBed=c.traits?.find(t=>t.effect&&t.effect.activeAffair);
     if(isEasyBed&&Math.random()<0.15){
       let partner=pick(aliveC.filter(x=>x.id!==c.id));
@@ -5018,6 +5245,8 @@ function performNPCIntercourse(npcA,npcB){
 
 // 更改8：爱上一个人导致对其他人好感下降
 function processLoveExclusivity(lover,beloved){
+  // 对食关闭时不触发爱情排他性
+  if(!GS.settings.allowAffairs)return;
   let rel=getNpcRelation(lover.id,beloved.id);
   if(rel>=60){
     // 对其他人好感>60的下降
@@ -5038,18 +5267,24 @@ function processLoveExclusivity(lover,beloved){
 function processNPCMedical(){
   GS.concubines.forEach(c=>{
     if(!c.alive||c.inColdPalace)return;
-    if(c.constitution<300&&(c.medicalThisYear||0)<2&&Math.random()<0.2){
-      let gain=rand(50,100);
-      c.constitution=clamp(c.constitution+gain,0,1000);
-      c.medicalThisYear=(c.medicalThisYear||0)+1;
-      addNpcLog(c.id,`请太医调理身体，体质增加${gain}`);
-      // 概率与太医私通
-      if(GS.doctors.length>0&&Math.random()<0.08){
-        let doc=pick(GS.doctors);
-        addNpcLog(c.id,`与太医${doc.fullName}暗中私通`);
-        c.sexExperience=(c.sexExperience||0)+1;
-        addSexRecord(c.id,'others',`与太医${doc.fullName}私通`);
-        if(!GS.outsidePersonnel.find(o=>o.id===doc.id))GS.outsidePersonnel.push(doc);
+    // 半年一次：medicalThisYear上限改为1（每年最多2次=每半年1次），并且增加月份判定
+    // 实现方式：每6个月才允许一次，用lastMedicalMonth记录
+    if(c.constitution<300){
+      if(!c._lastMedicalMonth)c._lastMedicalMonth={year:0,month:0};
+      let monthsSinceLast=(GS.date.year-c._lastMedicalMonth.year)*12+(GS.date.month-c._lastMedicalMonth.month);
+      if(monthsSinceLast>=6&&Math.random()<0.2){
+        let gain=rand(50,100);
+        c.constitution=clamp(c.constitution+gain,0,1000);
+        c._lastMedicalMonth={year:GS.date.year,month:GS.date.month};
+        addNpcLog(c.id,`请太医调理身体，体质增加${gain}`);
+        // 概率与太医私通
+        if(GS.doctors.length>0&&Math.random()<0.08){
+          let doc=pick(GS.doctors);
+          addNpcLog(c.id,`与太医${doc.fullName}暗中私通`);
+          c.sexExperience=(c.sexExperience||0)+1;
+          addSexRecord(c.id,'others',`与太医${doc.fullName}私通`);
+          if(!GS.outsidePersonnel.find(o=>o.id===doc.id))GS.outsidePersonnel.push(doc);
+        }
       }
     }
   });
@@ -5093,6 +5328,8 @@ function processNPCMonthlyBehavior(){
 
 // 更改9：一见钟情事件
 function processLoveAtFirstSight(){
+  // 对食关闭时不触发一见钟情
+  if(!GS.settings.allowAffairs)return;
   if(!GS._loveAtFirstSightChecked)GS._loveAtFirstSightChecked={};
   let aliveC=GS.concubines.filter(c=>c.alive&&!c.inColdPalace);
   aliveC.forEach(c=>{
@@ -5117,6 +5354,8 @@ function processLoveAtFirstSight(){
 
 // 单恋痛苦：每三个月判定
 function processUnrequitedLoveSuffering(){
+  // 对食关闭时不触发单恋痛苦
+  if(!GS.settings.allowAffairs)return;
   let aliveC=GS.concubines.filter(c=>c.alive);
   aliveC.forEach(c=>{
     if(!c._crushOn||c._crushOn.length===0)return;
@@ -5264,7 +5503,12 @@ function renderPregnantSceneStep(){
 
   if(d.speaker==='emperor'){
     let speakerName=GS.emperor.fullName;
-    let html=`<div class="bedchamber-overlay"></div><div class="bedchamber-content"><div style="text-align:center;margin-bottom:16px"><img src="${GS.emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div><div class="dialogue-box"><div class="dialogue-speaker">${speakerName}</div><div class="dialogue-text">${d.text}</div><div class="dialogue-choices"><button class="dialogue-choice-btn" onclick="pregnantSceneNext()">继续</button></div></div></div>`;
+    let sceneText=d.text;
+    // 更改8：皇帝盛宠>60时用昵称称呼玩家
+    if(GS.emperor&&GS.emperor.favor>=60&&GS.player.nickname){
+      sceneText=sceneText.replace(/你(?!们)/,GS.player.nickname+'，你');
+    }
+    let html=`<div class="bedchamber-overlay"></div><div class="bedchamber-content"><div style="text-align:center;margin-bottom:16px"><img src="${GS.emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div><div class="dialogue-box"><div class="dialogue-speaker">${speakerName}</div><div class="dialogue-text">${sceneText}</div><div class="dialogue-choices"><button class="dialogue-choice-btn" onclick="pregnantSceneNext()">继续</button></div></div></div>`;
     bdView.innerHTML=html;
     data.step++;
   }else if(d.speaker==='player_choice'){
@@ -5523,15 +5767,30 @@ function createChild(mother){
     let isEmperorFather=mother.pregnantFather==='emperor';
     let canBeHeir=(g==='male'||g==='bisexual')&&!isForeignMother;
 
-    let childTalent=rand(10,100);
+    // 更改7：天资由双方学识决定
+    let fatherKnowledge=0;
+    if(isPlayerFather){fatherKnowledge=GS.player.knowledge||0;}
+    else if(isEmperorFather){fatherKnowledge=GS.emperor?(GS.emperor.knowledge||0):500;}
+    else{
+      let fatherNpc=findNPC(mother.pregnantFather);
+      fatherKnowledge=fatherNpc?(fatherNpc.knowledge||0):300;
+    }
+    let motherKnowledge=mother.knowledge||0;
+    let avgKnowledge=Math.floor((fatherKnowledge+motherKnowledge)/2);
+    let talentBase=Math.floor(avgKnowledge/10);
+    let childTalent=clamp(rand(talentBase,talentBase+10),0,100);
+
     let childConstitution=rand(20,80);
     let childAppearance=rand(20,80);
     let childPersonality=pick(CHILD_PERSONALITIES);
     let initImperialFavor=0;
     if(isEmperorFather&&canBeHeir)initImperialFavor=20;
 
+    // 更改2：孩子跟随皇帝的姓
+    let emperorSurname=GS.emperor?GS.emperor.surname:'皇';
+
     return {
-      name:`${mother.surname}${g==='female'?pick(FEMALE_NAMES):pick(MALE_NAMES)}`,
+      name:`${emperorSurname}${g==='female'?pick(FEMALE_NAMES):pick(MALE_NAMES)}`,
       gender:g,
       age:0,
       alive:true,
@@ -5576,13 +5835,19 @@ function processServantGathering(){
 
 function processNPCInteractions(){
   let aliveC=GS.concubines.filter(c=>c.alive&&!c.inColdPalace);
+  let interFreq=GS.settings.interactionFrequency||'medium';
+  let baseChance=interFreq==='low'?0.08:(interFreq==='high'?0.25:0.15);
+  let affairAllowed=GS.settings.allowAffairs;
   for(let i=0;i<aliveC.length;i++){
-    if(Math.random()<0.15){
+    if(Math.random()<baseChance){
       let other=pick(aliveC.filter(c=>c.id!==aliveC[i].id));
       if(!other)continue;
       let rel=getNpcRelation(aliveC[i].id,other.id);
       let change=rand(-5,5);
-      setNpcRelation(aliveC[i].id,other.id,rel+change);
+      let newVal=rel+change;
+      // 对食关闭时好感上限60
+      if(!affairAllowed)newVal=Math.min(newVal,60);
+      setNpcRelation(aliveC[i].id,other.id,newVal);
       let newRel=getNpcRelation(aliveC[i].id,other.id);
       if(newRel>40&&rel<=40){addNpcLog(aliveC[i].id,`与${other.surname}${other.rank}交好`);addNpcLog(other.id,`与${aliveC[i].surname}${aliveC[i].rank}交好`);}
       if(newRel<-30&&rel>=-30){addNpcLog(aliveC[i].id,`与${other.surname}${other.rank}交恶`);addNpcLog(other.id,`与${aliveC[i].surname}${aliveC[i].rank}交恶`);}
@@ -5690,9 +5955,14 @@ function renderPersonnel(){
       let ft=getFavorText(GS.empressDowager.favor||0);
       html+=`<tr><td>${GS.empressDowager.surname}太后</td><td>${genderText(GS.empressDowager.gender)}</td><td>${GS.empressDowager.age}</td><td>太后</td><td>${GS.empressDowager.discovered?.personality?GS.empressDowager.personality:'???'}</td><td style="color:${ft.color}">${ft.text}</td><td><button class="detail-btn" onclick="showNPCDetailReadonly('${GS.empressDowager.id}')">详情</button></td></tr>`;
     }
+    // 先显示活着的
     GS.concubines.filter(c=>c.alive).forEach(c=>{
       let ft=getFavorText(c.favor||0);
       html+=`<tr><td>${getNPCDisplayName(c)}</td><td>${genderText(c.gender)}</td><td>${c.age}</td><td>${c.rank}${c.inColdPalace?' <span style="color:#f44336;font-size:9px">（冷宫）</span>':''}</td><td>${c.discovered?.personality?c.personality:'???'}</td><td style="color:${ft.color}">${ft.text}</td><td><button class="detail-btn" onclick="showNPCDetailReadonly('${c.id}')">详情</button></td></tr>`;
+    });
+    // 再显示已故的（灰色）
+    GS.concubines.filter(c=>!c.alive).forEach(c=>{
+      html+=`<tr style="opacity:0.45;color:#999"><td style="color:#999">${getNPCDisplayName(c)}</td><td style="color:#999">${genderText(c.gender)}</td><td style="color:#999">${c.age}</td><td style="color:#999">${c.rank||'已故'} <span style="color:#999;font-size:9px">（已故）</span></td><td style="color:#999">${c.discovered?.personality?c.personality:'???'}</td><td style="color:#999">—</td><td><button class="detail-btn" onclick="showNPCDetailReadonly('${c.id}')">详情</button> <button class="detail-btn" onclick="showNpcHistory('${c.id}')">履历</button></td></tr>`;
     });
     html+=`</tbody></table>`;
   }else if(activeTab==='children'){
@@ -5730,7 +6000,9 @@ function renderSettings(){
     <div class="setting-item"><span class="setting-label">选秀人数</span><select class="setting-select" onchange="GS.settings.selectionCount=this.value"><option value="few" ${s.selectionCount==='few'?'selected':''}>少量</option><option value="medium" ${s.selectionCount==='medium'?'selected':''}>中等</option><option value="many" ${s.selectionCount==='many'?'selected':''}>大量</option></select></div>
     <div class="setting-item"><span class="setting-label">允许剧情妃</span><div class="setting-toggle ${s.allowPlotConcubines?'on':''}" onclick="toggleSetting('allowPlotConcubines',this)"></div></div>
     <div class="setting-item"><span class="setting-label">宫斗频率</span><select class="setting-select" onchange="GS.settings.conflictFrequency=this.value"><option value="low" ${s.conflictFrequency==='low'?'selected':''}>低</option><option value="medium" ${s.conflictFrequency==='medium'?'selected':''}>中</option><option value="high" ${s.conflictFrequency==='high'?'selected':''}>高</option></select></div>
+    <div class="setting-item"><span class="setting-label">后宫互动频率</span><select class="setting-select" onchange="GS.settings.interactionFrequency=this.value"><option value="low" ${(s.interactionFrequency||'medium')==='low'?'selected':''}>低</option><option value="medium" ${(s.interactionFrequency||'medium')==='medium'?'selected':''}>中</option><option value="high" ${(s.interactionFrequency||'medium')==='high'?'selected':''}>高</option></select></div>
     <div class="setting-item"><span class="setting-label">允许妃子对食</span><div class="setting-toggle ${s.allowAffairs?'on':''}" onclick="toggleSetting('allowAffairs',this)"></div></div>
+    <div style="font-size:9px;color:#8b7355;padding:0 0 4px 4px;margin-top:-4px">开启：允许后宫妃嫔相爱、偷情 ｜ 关闭：好感仅为友谊，不会发展恋情</div>
   </div>`;
   document.getElementById('settings-view').innerHTML=html;
 }
