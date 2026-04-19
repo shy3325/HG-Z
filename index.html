@@ -1619,6 +1619,9 @@ const TITLE_POOL = [
   '端','淑','庄','静','惠','慧','贞','敏','婉','懿','柔','安','嘉','宁','雅','华','瑞','瑶','凤','鸾',
   '兰','蕙','芝','芳','馨','秀','灵','妙','清','澄','瑾','璟','琳','珮','翠','碧','丹','彩','锦','绮',
   '荣','和','顺','德','容','仪','淳','温','善','慈','明','昭','韶','绚','曦','霞','晖','映','辉','璧',
+  '猫','狗',
+  '莺','燕','鹤','鹊','鸳','蝶','萤','雀','鸢','鸥',
+  '玉','珠','琥','珀','琉','璃','瑛','琬','琰','珊',
 ];
 
 const LOWEST_RANKS = ['选侍','答应','更衣'];
@@ -2074,6 +2077,13 @@ const LOCATION_NAMES = {
 const LOCATION_BGS = {
   emperor_palace:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1775998633/fpei1tbvblblna1ztwol.png',
   concubine_quarters:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1775998637/pnhejcgpitdgvjnkbzj1.png',
+  imperial_garden:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776512512/ntdopumrwacfdnz0b4j6.jpg',
+  school:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776513539/i0qkns6ylw6vuivhbhda.jpg',
+  neiwufu:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776560897/uvehbidvxkna26sthiaa.png',
+  empress_dowager_palace:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776560924/ehtwq4daq1giqcb8qckf.jpg',
+  celestial_master:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776571935/wudnmk60hqmotxaxlbal.png',
+  cold_palace:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776572057/h6lylhbe8jrj2hk1wnrm.jpg',
+  chonghua_palace:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1776512511/bqthd38qxkeoix5qixce.jpg',
   default:'https://res.cloudinary.com/dnezkz9ma/image/upload/v1775998637/pnhejcgpitdgvjnkbzj1.png',
 };
 
@@ -2308,6 +2318,8 @@ let GS = {
   monthlySalaryShown: false,
   emperorVisitedThisMonth: false,
   poisonRecords: {},
+  redeemedCodes: [],
+  specialItems: [],
 };
 
 let currentAvatarIndex = 0;
@@ -2517,6 +2529,7 @@ function generateNPC(type,forcedRank,forcedGender){
   TALENT_NAMES.forEach(t=>{talents[t]=type==='concubine'?rand(0,60):rand(10,50);});
   let hobby=pick(TALENT_NAMES);
 
+  let lifespanVal=type==='emperor'?rand(50,88):(type==='empress_dowager'?rand(50,88):rand(40,68));
   let npc={
     id:Date.now()+'_'+Math.random().toString(36).substr(2,6),
     type,
@@ -2525,7 +2538,8 @@ function generateNPC(type,forcedRank,forcedGender){
     fullName:nameData.full,
     nickname:'',
     gender,age,
-    lifespan:rand(50,88),
+    lifespan:lifespanVal,
+    lifespanRevealed:type==='emperor'?true:false,
     rank:forcedRank||'',
     personality,
     avatar:type==='emperor'?assignAvatar(avatarGender,true):assignAvatar(avatarGender),
@@ -2679,6 +2693,7 @@ function findNPC(id){
   if(c)return c;
   let d=GS.doctors?.find(d=>d.id===id);
   if(d)return d;
+  if(GS._celestialMaster&&GS._celestialMaster.id===id)return GS._celestialMaster;
   let o=GS.outsidePersonnel?.find(o=>o.id===id);
   if(o)return o;
   return null;
@@ -2865,8 +2880,8 @@ function renderPalace(){
   let html=`    <div class="palace-stats-box">
     <div class="palace-header"><img class="palace-avatar" src="${p.avatar}" loading="lazy"><div class="palace-name-info"><div class="palace-name">${p.honorTitle?'「'+p.honorTitle+'」 ':''}${p.fullName}（${p.nickname}）</div><div class="palace-rank">${p.rank}${p.inColdPalace?' （冷宫）':''} · ${genderText(p.gender)}</div></div></div>
     <div class="palace-stats-grid">
-      <div class="palace-stat-item"><span class="palace-stat-label">年龄</span><span class="palace-stat-val">${p.age}</span></div>
-      <div class="palace-stat-item"><span class="palace-stat-label">寿元</span><span class="palace-stat-val">${p.lifespan}</span></div>
+      <div class="palace-stat-item"><span class="palace-stat-label">年龄</span><span class="palace-stat-val">${p.age}岁</span></div>
+      <div class="palace-stat-item"><span class="palace-stat-label">寿元</span><span class="palace-stat-val">${p.lifespan}载</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">魅力</span><span class="palace-stat-val">${p.charm}/1000</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">体质</span><span class="palace-stat-val">${p.constitution}/1000</span></div>
       <div class="palace-stat-item"><span class="palace-stat-label">尺寸</span><span class="palace-stat-val">${p.dickSize}cm</span></div>
@@ -3171,7 +3186,6 @@ function renderMap(){
 function visitLocation(key){
   let locView=document.getElementById('location-view');
   let bg=LOCATION_BGS[key]||LOCATION_BGS.default;
-  if(key==='emperor_palace')bg=LOCATION_BGS.emperor_palace;
   locView.style.backgroundImage=`url('${bg}')`;
   locView.style.display='block';
   document.getElementById('map-view').style.display='none';
@@ -3182,11 +3196,11 @@ function visitLocation(key){
   else if(key==='empress_dowager_palace') html+=renderNPCLocation(GS.empressDowager);
   else if(key==='concubine_quarters') html+=renderConcubineQuarters();
   else if(key==='neiwufu') html+=renderNeiWuFu();
-  else if(key==='imperial_garden') html+=`<div class="npc-list-in-location"><div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">御花园花木扶疏，清风徐来。</div>${renderRandomEncounter()}</div>`;
+  else if(key==='imperial_garden') html+=renderImperialGarden();
   else if(key==='cold_palace') html+=renderColdPalaceWithCheck();
   else if(key==='school') html+=renderSchool();
   else if(key==='chonghua_palace') html+=renderChonghuaPalace();
-  else if(key==='celestial_master') html+=`<div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">钦天监肃穆清幽。此处暂无可做之事。</div>`;
+  else if(key==='celestial_master') html+=renderCelestialMaster();
 
   html+=`</div>`;
   locView.innerHTML=html;
@@ -3393,7 +3407,16 @@ function bribeColdPalace(){
   locView.innerHTML=html;
 }
 
-function backToMap(){document.getElementById('location-view').style.display='none';document.getElementById('map-view').style.display='block';renderMap();}
+function backToMap(){
+  document.getElementById('location-view').style.display='none';
+  document.getElementById('map-view').style.display='block';
+  // 清除御花园探索状态
+  GS._gardenExplored=false;
+  GS._gardenEncountered=[];
+  GS._gardenEmperorPresent=false;
+  GS._gardenEmperorCompanion=null;
+  renderMap();
+}
 
 function renderNPCLocation(npc){
   if(!npc||!npc.alive)return '<div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">空无一人。</div>';
@@ -3467,12 +3490,176 @@ function coldPalaceRape(id){
   takeVirginity(npc,'back',GS.player.fullName);
 }
 
-function renderSchool(){
-  let kids=GS.children.filter(c=>c.alive&&c.gender==='male'&&c.age>=6);
-  if(kids.length===0)return'<div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">上书房中朗朗书声，暂无皇子在此。</div>';
-  let html=`<div class="npc-list-in-location">`;
-  kids.forEach(k=>{html+=`<div class="npc-card-small"><div class="npc-card-info"><div class="npc-card-name">${k.name}</div><div class="npc-card-rank">皇子 · ${k.age}岁</div></div></div>`;});
-  html+=`</div>`;return html;
+function renderCelestialMaster(){
+  // 天师每月50%概率出现
+  if(!GS._celestialMasterGenerated||GS._celestialMasterMonth!==GS.date.month||GS._celestialMasterYear!==GS.date.year){
+    GS._celestialMasterMonth=GS.date.month;
+    GS._celestialMasterYear=GS.date.year;
+    GS._celestialMasterPresent=Math.random()<0.5;
+    GS._celestialMasterGenerated=true;
+    if(GS._celestialMasterPresent&&!GS._celestialMaster){
+      let cmGender=Math.random()<0.7?'male':'bisexual';
+      let cmName=generateNPCName('male');
+      let cmAvatar=assignAvatar('male');
+      GS._celestialMaster={
+        id:'celestial_'+Date.now(),
+        type:'celestial_master',
+        surname:cmName.surname,
+        given:cmName.given,
+        fullName:cmName.full,
+        gender:cmGender,
+        age:rand(35,65),
+        rank:'天师',
+        personality:pick(['神秘','淡泊','癫狂','深沉','洒脱']),
+        avatar:cmAvatar,
+        charm:rand(100,500),
+        constitution:rand(300,700),
+        dickSize:(cmGender==='male'||cmGender==='bisexual')?rand(14,28):0,
+        fertility:rand(30,70),
+        favor:0,
+        alive:true,
+        pregnant:false,
+        pregnantMonth:0,
+        pregnantFather:null,
+        canBear:cmGender==='bisexual',
+        virginity:initVirginity({gender:cmGender}),
+        sexExperience:rand(0,15),
+        talents:{},
+        traits:[],
+        children:[],
+        network:rand(5,30),
+        knowledge:rand(600,1000),
+        discovered:{personality:true,hobby:true,charm:true,constitution:true,fertility:true,scheming:true,inclination:true,talents:{}},
+      };
+      initSexRecord(GS._celestialMaster.id);
+      TALENT_NAMES.forEach(t=>{GS._celestialMaster.talents[t]=rand(0,40);GS._celestialMaster.discovered.talents[t]=true;});
+      if(!GS.outsidePersonnel.find(o=>o.id===GS._celestialMaster.id)){
+        GS.outsidePersonnel.push(GS._celestialMaster);
+      }
+    }
+  }
+
+  if(!GS._celestialMasterPresent||!GS._celestialMaster){
+    return `<div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">钦天监肃穆清幽，焚香袅袅。\n\n天师本月云游在外，不在此处。</div>`;
+  }
+
+  let cm=GS._celestialMaster;
+  let cmFavor=cm.favor||0;
+  let ft=getFavorText(cmFavor);
+
+  let html=`<div class="npc-list-in-location">
+    <div style="text-align:center;margin:12px 0"><img src="${cm.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(180,150,200,0.5);object-fit:cover" loading="lazy"></div>
+    <div style="color:#f5e6c8;font-size:12px;text-align:center;margin-bottom:8px">${cm.fullName} · 天师 · ${genderText(cm.gender)}</div>
+    <div style="color:#c9a96e;font-size:11px;text-align:center;margin-bottom:16px">好感：<span style="color:${ft.color}">${ft.text}（${cmFavor}）</span></div>
+    <button class="modal-btn" onclick="celestialChat()">交谈（⚡1）</button>
+    <button class="modal-btn" onclick="celestialDivineLifespan()">卜算寿元（10金·⚡1）</button>
+    ${cmFavor>=60?'<button class="modal-btn interact-btn sexual" onclick="celestialBed()">共赴巫山（⚡1）</button>':''}
+    <button class="modal-btn" style="background:rgba(100,80,60,0.5)" onclick="showCelestialDetail()">查看详情</button>
+  </div>`;
+  return html;
+}
+
+function celestialChat(){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  GS.stamina--;updateTopBar();
+  let cm=GS._celestialMaster;if(!cm)return;
+  showActionProgress(()=>{
+    let gain=rand(3,5);
+    cm.favor=clamp((cm.favor||0)+gain,-100,100);
+    let chatTexts=[
+      `天师抬眼看你，手中的拂尘轻轻一摆。"施主面相颇佳，紫微星动，前途未可限量。"`,
+      `天师盘腿坐在蒲团上，闭着眼睛似乎在入定。听见你的脚步声，微微睁开一只眼。"又来了？坐罢，贫道正好无聊。"`,
+      `天师从丹炉旁抬起头，鼻尖沾着一点灰烬。"你身上的气运……比上次来的时候浓郁了些。有意思。"`,
+      `天师将手中的龟甲翻来覆去看了半天，忽然冲你笑了笑。"你这人倒是有趣，宫里那群人可没几个敢来找贫道闲聊的。"`,
+      `天师递给你一杯药茶，味道苦涩中带着回甘。"喝罢。这是贫道自己炼的养生茶，喝了延年益寿。"`,
+    ];
+    showToast(pick(chatTexts)+`（好感+${gain}）`);
+  });
+}
+
+function celestialDivineLifespan(){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  if(totalSilver()<1000){showToast('金钱不足（需10金）');return;}
+  GS.stamina--;
+  addMoney(-10,0);updateTopBar();
+  let cm=GS._celestialMaster;if(!cm)return;
+  cm.favor=clamp((cm.favor||0)+rand(3,5),-100,100);
+
+  let targets=getAllNPCs().filter(n=>n.alive&&!n.lifespanRevealed);
+  if(targets.length===0){showToast('天师掐指一算："宫中诸人的寿数，施主已尽知矣。"');return;}
+
+  let html=`<div class="modal-title">卜算寿元</div><button class="modal-close" onclick="closeModal()">✕</button>
+    <div style="font-size:11px;color:#8b7355;text-align:center;margin-bottom:10px">天师闭目凝神，掐指推演……\n选择要卜算之人：</div>`;
+  targets.forEach(t=>{
+    html+=`<button class="modal-btn" onclick="revealLifespan('${t.id}')">${t.surname}${t.rank||t.fullName}</button>`;
+  });
+  openModal(html);
+}
+
+function revealLifespan(npcId){
+  let npc=findNPC(npcId);if(!npc)return;
+  npc.lifespanRevealed=true;
+  let revealTexts=[
+    `天师睁开双眼，神色凝重。"此人……寿数${npc.lifespan}载。天命如此，非人力所能更改。"`,
+    `天师手中的龟甲裂开一道纹路。他看了看，缓缓开口："${npc.lifespan}年阳寿。是福是祸，端看造化。"`,
+    `天师拂尘一挥，在虚空中划出几道光痕。"贫道算得此人寿元……${npc.lifespan}载。"`,
+    `天师将铜钱抛起又接住，反复三次，最终叹了口气。"${npc.lifespan}年。不多不少。"`,
+    `天师闭目片刻，忽然睁眼盯着你。"你当真要知道？……罢了。${npc.lifespan}载。记住了，知天命者，不可妄言。"`,
+  ];
+  showToast(pick(revealTexts));
+  closeModal();
+}
+
+function celestialBed(){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  GS.stamina--;updateTopBar();
+  let cm=GS._celestialMaster;if(!cm)return;
+  closeModal();
+
+  showActionProgress(()=>{
+    cm.sexExperience=(cm.sexExperience||0)+1;
+    GS.player.sexExperience=(GS.player.sexExperience||0)+1;
+    addSexRecord(cm.id,'player',`与${GS.player.surname}${GS.player.rank}在钦天监私通`);
+    addNpcLog('player',`与天师${cm.fullName}在钦天监私通`);
+
+    let holes=[];
+    if(cm.gender==='male'){holes=['back'];}
+    else{holes=['front','back'];}
+    let usedHole=pick(holes);
+    takeVirginity(cm,usedHole,GS.player.fullName);
+
+    let bedTexts=[
+      `钦天监的密室中，丹炉的余温尚在。天师的道袍散落一地，你将他按在蒲团上，他的呼吸随着你的动作变得急促而紊乱。\n\n"施主……嗯……你这般鲁莽……贫道的修为……要被你毁了……"`,
+      `天师的背脊贴着冰凉的石壁，双腿缠上你的腰。他平日里那副仙风道骨的模样此刻全然崩塌，只剩下压抑的喘息和微微颤抖的指尖。\n\n"你……嗯……轻些……这里隔音不好……"`,
+      `你将天师推倒在堆满竹简的案台上，竹简哗啦啦滚落一地。他咬着拂尘的穗子，不让自己发出太大的声响。\n\n"唔……贫道……贫道度你……嗯啊……不是被你度……"`,
+    ];
+
+    let resultText=pick(bedTexts);
+
+    // 好感90以上才不做事后清理，愿意怀孕
+    let willKeep=cm.favor>=90;
+    let canImpregnate=(usedHole==='front'&&cm.canBear)||(usedHole==='back'&&cm.gender==='male');
+
+    if(willKeep){
+      resultText+=`\n\n事后，天师慵懒地靠在你怀中，并未如往常那般急着清理。\n\n"罢了……贫道修的是顺天应命之道。若有了……便是天意。"`;
+      if(canImpregnate&&!cm.pregnant&&Math.random()*100<cm.fertility){
+        cm.pregnant=true;cm.pregnantMonth=0;cm.pregnantFather='player';
+        resultText+=`\n\n（此后不久，天师似有了身孕……）`;
+        addNpcLog(cm.id,'有孕（与玩家私通所得）');
+      }
+    }else{
+      resultText+=`\n\n事后，天师面不改色地整理好衣袍，从丹炉旁取出一碗药汤仰头饮尽。\n\n"贫道自有法子。施主不必担忧。"\n\n他将一切痕迹清理得干干净净，仿佛方才什么都没发生过。`;
+    }
+
+    openModal(`<div class="modal-title">钦天监 · 私会</div><button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-text" style="white-space:pre-line;line-height:2">${resultText}</div>
+      <button class="modal-btn" onclick="closeModal()">整理衣冠</button>`);
+  });
+}
+
+function showCelestialDetail(){
+  let cm=GS._celestialMaster;if(!cm)return;
+  showNPCDetailReadonly(cm.id);
 }
 
 function renderRandomEncounter(){
@@ -3480,6 +3667,452 @@ function renderRandomEncounter(){
   if(possible.length===0)return'';
   let encountered=pick(possible);
   return `<div class="npc-card-small" onclick="openNPCInteraction('${encountered.id}')"><div class="avatar-wrapper"><img class="npc-card-avatar" src="${encountered.avatar}"></div><div class="npc-card-info"><div class="npc-card-name">${encountered.surname}${encountered.rank}</div><div class="npc-card-rank">偶遇于此</div></div></div>`;
+}
+
+function renderImperialGarden(){
+  let html=`<div class="npc-list-in-location">
+    <div style="color:#f5e6c8;font-size:12px;text-align:center;margin:20px 0">御花园花木扶疏，清风徐来，水榭亭台掩映在翠竹丛中。</div>`;
+  if(GS._gardenExplored){
+    let encountered=GS._gardenEncountered||[];
+    let emperorPresent=GS._gardenEmperorPresent||false;
+    if(emperorPresent){
+      let companionName=GS._gardenEmperorCompanion?getNPCDisplayName(findNPC(GS._gardenEmperorCompanion)):'';
+      html+=`<div style="color:#f5e6c8;font-size:12px;text-align:center;margin:10px 0">皇帝正在此处${companionName?'，'+companionName+'相伴在侧':''}。</div>`;
+      html+=`<div class="npc-card-small" onclick="gardenApproachEmperor()">
+        <img class="npc-card-avatar" src="${GS.emperor.avatar}" loading="lazy">
+        <div class="npc-card-info"><div class="npc-card-name">${GS.emperor.fullName}（皇帝）</div><div class="npc-card-rank">正在赏花</div></div>
+        <div class="npc-card-btns"><button class="detail-btn" onclick="event.stopPropagation();gardenApproachEmperor()">前往</button></div>
+      </div>`;
+    }
+    encountered.forEach(cid=>{
+      let c=findNPC(cid);if(!c||!c.alive)return;
+      html+=`<div class="npc-card-small" onclick="openNPCInteractionGarden('${c.id}')">
+        <div class="avatar-wrapper"><img class="npc-card-avatar" src="${c.avatar}"><div class="history-badge" onclick="event.stopPropagation();showNpcHistory('${c.id}')">📋</div></div>
+        <div class="npc-card-info"><div class="npc-card-name">${getNPCDisplayName(c)}</div><div class="npc-card-rank">${genderText(c.gender)} · 偶遇</div></div>
+        <div class="npc-card-btns"><button class="detail-btn" onclick="event.stopPropagation();showNPCDetailReadonly('${c.id}')">详情</button></div>
+      </div>`;
+    });
+    if(encountered.length===0&&!emperorPresent){
+      html+=`<div style="color:#f5e6c8;font-size:11px;text-align:center;margin:12px 0;opacity:0.7">四下无人，花影寂寂。</div>`;
+    }
+  }
+  html+=`<div style="margin-top:20px;text-align:center"><button class="modal-btn" style="width:220px" onclick="exploreGarden()">${GS._gardenExplored?'再次闲逛':'闲逛'}（⚡1）</button></div>`;
+  html+=`</div>`;
+  return html;
+}
+
+function exploreGarden(){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  GS.stamina--;updateTopBar();
+  GS._gardenExplored=true;
+  GS._gardenEncountered=[];
+  GS._gardenEmperorPresent=false;
+  GS._gardenEmperorCompanion=null;
+
+  // 皇帝15%概率出现
+  if(Math.random()<0.15){
+    GS._gardenEmperorPresent=true;
+    // 皇帝身边可能有妃子
+    let aliveC=GS.concubines.filter(c=>c.alive&&!c.inColdPalace);
+    if(aliveC.length>0&&Math.random()<0.5){
+      GS._gardenEmperorCompanion=pick(aliveC).id;
+    }
+  }
+
+  // 1-3个妃子出现
+  let count=rand(1,3);
+  let aliveC=GS.concubines.filter(c=>c.alive&&!c.inColdPalace&&c.id!==GS._gardenEmperorCompanion);
+  let shuffled=[...aliveC].sort(()=>Math.random()-0.5);
+  for(let i=0;i<Math.min(count,shuffled.length);i++){
+    GS._gardenEncountered.push(shuffled[i].id);
+  }
+
+  showActionProgress(()=>{
+    visitLocation('imperial_garden');
+  });
+}
+
+function openNPCInteractionGarden(id){
+  let npc=findNPC(id);if(!npc)return;
+  let favor=npc.favor||0;
+
+  // 更改7：好感为负时20%概率推入水中
+  if(favor<0&&Math.random()<0.2){
+    triggerPushIntoWater(npc);
+    return;
+  }
+
+  openNPCInteraction(id);
+}
+
+function triggerPushIntoWater(aggressor){
+  let pushTexts=[
+    `${aggressor.surname}${aggressor.rank}面色骤变，冷笑一声，猛地将你推向池边！你脚下一滑，整个人栽入了荷花池中！`,
+    `你正与${aggressor.surname}${aggressor.rank}交谈，对方突然伸手用力一推！你踉跄后退，扑通一声跌入了碧波之中！`,
+    `${aggressor.surname}${aggressor.rank}眼中闪过狠厉之色，趁你不备，狠狠将你推落水中。冰冷的池水瞬间没过你的头顶。`,
+  ];
+  let pushText=pick(pushTexts);
+
+  // 检查侍从是否忠心耿耿
+  let loyalServant=GS.player.servants.find(s=>(s._favor||0)>=80);
+  let hasServant=GS.player.servants.length>0;
+  let resultText='';
+  let constitutionLoss=0;
+
+  if(loyalServant){
+    resultText=`你的${loyalServant.type}${loyalServant.name}见状大惊，毫不犹豫地纵身跃入水中，将你奋力拖出！\n\n所幸救援及时，你浑身湿透，受了些惊吓，并无大碍。`;
+    constitutionLoss=0;
+  }else if(hasServant){
+    let servantFavor=GS.player.servants[0]._favor||0;
+    if(servantFavor>=50){
+      resultText=`你的宫人见状连忙呼救，几个路过的太监合力将你拉出水面。你呛了几口水，所幸性命无虞。`;
+      constitutionLoss=rand(30,60);
+    }else{
+      resultText=`你在水中挣扎许久，宫人们手忙脚乱，好半天才将你捞出。你被灌了满肚子的池水，事后大病一场，卧榻多日。`;
+      constitutionLoss=rand(100,150);
+    }
+  }else{
+    resultText=`你在水中拼命挣扎，幸而有路过的太监听见动静赶来搭救。你被拖上岸时已然半昏半醒，此后大病一场，元气大伤。`;
+    constitutionLoss=rand(100,150);
+  }
+
+  GS.player.constitution=clamp(GS.player.constitution-constitutionLoss,0,1000);
+
+  // 肇事妃子惩罚
+  aggressor.love=clamp((aggressor.love||0)-10,0,100);
+  let oldRank=aggressor.rank;
+  let currentIdx=getRankIndex(aggressor.rank);
+  if(currentIdx<RANK_TABLE.length-1){
+    aggressor.rank=RANK_TABLE[currentIdx+1].rank;
+  }
+  aggressor._confinedUntil={year:GS.date.year,month:GS.date.month+3};
+  if(aggressor._confinedUntil.month>12){aggressor._confinedUntil.year++;aggressor._confinedUntil.month-=12;}
+
+  addNpcLog(aggressor.id,`在御花园将${GS.player.surname}${GS.player.rank}推入水中，被皇帝降位一级（${oldRank}→${aggressor.rank}），禁足三月。`);
+  addNpcLog('player',`在御花园被${aggressor.surname}${aggressor.rank}推入水中${constitutionLoss>0?'，大病一场，体质-'+constitutionLoss:''}。`);
+  GS.emperorMood=clamp(GS.emperorMood-5,0,100);
+
+  openModal(`<div class="modal-title">落水！</div><button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-text" style="line-height:2">${pushText}\n\n${resultText}\n\n${aggressor.surname}${aggressor.rank}事后被皇帝降位一级，禁足三月。${constitutionLoss>0?'\n\n体质 -'+constitutionLoss:''}</div>
+    <button class="modal-btn" onclick="closeModal()">知道了</button>`);
+  updateTopBar();
+}
+
+function gardenApproachEmperor(){
+  let companion=GS._gardenEmperorCompanion?findNPC(GS._gardenEmperorCompanion):null;
+  let playerLove=GS.emperor.favor||0;
+
+  if(companion){
+    let companionLove=companion.love||0;
+    if(companionLove>playerLove){
+      // 皇帝选择对方留下
+      let rejectTexts=[
+        `皇帝看了你一眼，又看了看身旁的${companion.surname}${companion.rank}，微微摇头："朕今日已有人相伴，你且自便。"`,
+        `${companion.surname}${companion.rank}挽着皇帝的手臂，皇帝笑着拍了拍对方的手背，对你说道："改日再叙。"`,
+        `皇帝与${companion.surname}${companion.rank}正聊得兴起，见你走近，只淡淡颔首示意，并无留你之意。`,
+      ];
+      showToast(pick(rejectTexts));
+      return;
+    }else{
+      // 皇帝选择你留下，对方离开
+      let texts=[
+        `皇帝见你走来，眼中光芒一亮。转头对${companion.surname}${companion.rank}道："你先回去罢，朕想和${getPlayerCallName()}单独待一会儿。"`,
+        `${companion.surname}${companion.rank}识趣地行礼退下，皇帝向你招了招手："过来，陪朕走走。"`,
+      ];
+      showToast(pick(texts));
+      GS._gardenEmperorCompanion=null;
+      gardenAloneWithEmperor(companion);
+      return;
+    }
+  }
+
+  // 没有伴侣，直接单独相处
+  gardenAloneWithEmperor(null);
+}
+
+function gardenAloneWithEmperor(dismissedCompanion){
+  let html=`<div class="modal-title">御花园 · 与皇帝独处</div><button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="npc-detail-header"><img class="npc-detail-avatar" src="${GS.emperor.avatar}"><div><div class="npc-detail-name">${GS.emperor.fullName}</div><div class="npc-detail-rank">皇帝 · ${GS.emperor.personality}</div></div></div>
+    <button class="modal-btn" onclick="gardenChatEmperor()">闲聊（⚡1）</button>`;
+
+  // 骚浪皇帝主动勾引
+  if(GS.emperor.personality==='骚浪'){
+    html+=`<div style="font-size:11px;color:#e74c3c;margin:8px 0;text-align:center;font-style:italic">皇帝的目光在你身上流连，嘴角勾起一抹意味深长的笑……</div>`;
+  }
+
+  let gardenSexAllowed=false;
+  if(GS.emperor.personality==='骚浪'||GS.emperor.personality==='风流'){gardenSexAllowed=true;}
+  else if(GS.emperor.personality==='正直'){gardenSexAllowed=GS.emperor.favor>=80;}
+  else{gardenSexAllowed=GS.emperor.favor>=50;}
+  if(gardenSexAllowed){
+    html+=`<button class="modal-btn interact-btn sexual" onclick="gardenSexEmperor('${dismissedCompanion?dismissedCompanion.id:''}')">春风一度（野外）</button>`;
+  }
+
+  openModal(html);
+}
+
+function gardenChatEmperor(){
+  if(GS.stamina<=0){showToast('体力不足');checkAutoAdvance();return;}
+  GS.stamina--;updateTopBar();
+  showActionProgress(()=>{
+    GS.emperor.favor=clamp(GS.emperor.favor+rand(2,4),-100,100);
+    let texts=[
+      '你与皇帝在花丛间漫步，谈笑风生，气氛融洽。',
+      '皇帝指着池中锦鲤与你闲话家常，笑意盈盈。',
+      '你们在凉亭中对坐品茶，皇帝难得地卸下了帝王的威严。',
+      '皇帝折了一枝海棠递给你，说这花开得像你的笑颜。',
+      '你陪皇帝在竹林小径上散步，林间鸟鸣啾啾，两人都没有说话，可气氛却格外温馨。',
+    ];
+    showToast(pick(texts));
+    closeModal();
+  });
+}
+
+function gardenSexEmperor(nearbyCompanionId){
+  closeModal();
+  let emperor=GS.emperor;
+  let isSaoLang=emperor.personality==='骚浪';
+  let isFengLiu=emperor.personality==='风流';
+
+  let nearbyCompanion=nearbyCompanionId?findNPC(nearbyCompanionId):null;
+  let potentialWitness=null;
+  if(GS._gardenEncountered&&GS._gardenEncountered.length>0){
+    potentialWitness=findNPC(pick(GS._gardenEncountered));
+  }
+
+  // 性记录
+  emperor.sexExperience=(emperor.sexExperience||0)+1;
+  GS.player.sexExperience=(GS.player.sexExperience||0)+1;
+  let holes=[];
+  if(emperor.gender==='female'){holes=['front','back'];}
+  else if(emperor.gender==='male'){holes=['back'];}
+  else{holes=['front','back'];}
+  let usedHole=pick(holes);
+  takeVirginity(emperor,usedHole,GS.player.fullName);
+  addSexRecord(emperor.id,'player',`在御花园被${GS.player.surname}${GS.player.rank}野外行事（${usedHole==='front'?'前穴':'后穴'}）`);
+  addNpcLog(emperor.id,`在御花园与${GS.player.surname}${GS.player.rank}春风一度（野外）`);
+  addNpcLog('player',`在御花园将皇帝按在野外行事`);
+
+  // 分步互动式
+  let bdView=document.getElementById('bedchamber-view');
+  ['palace-view','map-view','personnel-view','settings-view','location-view'].forEach(vid=>{document.getElementById(vid).style.display='none';});
+  bdView.style.backgroundImage=`url('https://res.cloudinary.com/dnezkz9ma/image/upload/v1776512512/ntdopumrwacfdnz0b4j6.jpg')`;
+  bdView.style.display='block';
+
+  let openingText;
+  if(isSaoLang){
+    openingText=`皇帝忽然拉住你的手，将你拽进了假山后面的隐蔽处。他主动解开自己的腰带，回头看你，眼波流转。\n\n"这里没人看得见……你快些……朕等不及了。"`;
+  }else if(isFengLiu){
+    openingText=`你将皇帝引到了假山后的僻静处。他半推半就地靠在嶙峋的石壁上，嘴角带着玩味的笑意。\n\n"在这种地方……你可真大胆。"`;
+  }else{
+    openingText=`你将皇帝拉进了凉亭的角落，他起初有些犹豫，但你的手已经探入了他的衣襟。\n\n"你……在这种地方……"`;
+  }
+
+  let locationChoices=[
+    {text:'把皇帝按在草地上',loc:'grass'},
+    {text:'将皇帝抵在假山石壁上',loc:'rock'},
+    {text:'在凉亭的美人靠上',loc:'pavilion'},
+    {text:'拉到水榭深处的栏杆边',loc:'waterside'},
+  ];
+  let choicesHtml=locationChoices.map(c=>`<button class="dialogue-choice-btn" onclick="gardenSexStep2('${c.loc}','${nearbyCompanionId||''}')">${c.text}</button>`).join('');
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="text-align:center;margin-bottom:16px"><img src="${emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div>
+    <div class="dialogue-box"><div class="dialogue-speaker">御花园 · 春风一度</div>
+    <div class="dialogue-text" style="white-space:pre-line">${openingText}</div>
+    <div class="dialogue-text" style="font-style:italic;color:#c9a96e;margin:8px 0">你想把他带到哪里？</div>
+    <div class="dialogue-choices">${choicesHtml}</div></div></div>`;
+
+  // 存储窥见者信息供后续使用
+  window._gardenSexWitness=potentialWitness;
+  window._gardenSexHole=usedHole;
+}
+
+function gardenSexStep2(loc,nearbyCompanionId){
+  let emperor=GS.emperor;
+  let isSaoLang=emperor.personality==='骚浪';
+  let bdView=document.getElementById('bedchamber-view');
+
+  let locTexts={
+    grass:[
+      `你将皇帝推倒在御花园的草地上，四周繁花似锦。他仰面躺在青草之上，衣袍散乱。`,
+      `皇帝的后背贴着柔软的青草，花瓣从枝头飘落，沾在他汗湿的鬓发上。`,
+    ],
+    rock:[
+      `皇帝双手撑着嶙峋的假山石壁，翘起腰臀，衣袍半褪。石壁上的苔藓被他的指甲抓出了几道痕迹。`,
+      `你将他抵在假山的凹陷处，冰凉的石面贴着他发烫的肌肤，他激灵灵打了个寒颤。`,
+    ],
+    pavilion:[
+      `你让皇帝坐在凉亭的美人靠上，他的双腿悬在半空，被你握着脚踝分开。亭外是满池荷花，亭内是交缠的喘息。`,
+      `皇帝靠在凉亭的雕花柱子上，你托着他的腰，他的腿缠上了你的腰身。`,
+    ],
+    waterside:[
+      `水榭最深处，皇帝背靠着雕花栏杆。水面倒映着两个纠缠的身影，波光粼粼。`,
+      `你将他抵在水榭的栏杆上，身后是潺潺流水，身前是你灼热的呼吸。`,
+    ],
+  };
+
+  let sceneText=pick(locTexts[loc]||locTexts.grass);
+
+  let actionChoices=[
+    {text:'猛烈地冲刺，不给他喘息的机会',action:'fierce'},
+    {text:'缓慢而深沉地研磨，让他求你加速',action:'tease'},
+    {text:'翻过他的身体，从背后进入',action:'behind'},
+  ];
+  let choicesHtml=actionChoices.map(c=>`<button class="dialogue-choice-btn" onclick="gardenSexStep3('${c.action}','${nearbyCompanionId}')">${c.text}</button>`).join('');
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="text-align:center;margin-bottom:16px"><img src="${emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div>
+    <div class="dialogue-box"><div class="dialogue-speaker">御花园 · 春风一度</div>
+    <div class="dialogue-text" style="white-space:pre-line">${sceneText}\n\n你缓缓进入他的身体。他咬着下唇，喉咙里溢出压抑的闷哼。</div>
+    <div class="dialogue-choices">${choicesHtml}</div></div></div>`;
+}
+
+function gardenSexStep3(action,nearbyCompanionId){
+  let emperor=GS.emperor;
+  let isSaoLang=emperor.personality==='骚浪';
+  let bdView=document.getElementById('bedchamber-view');
+
+  let actionTexts={
+    fierce:[
+      `你猛然加速，每一下都顶到最深处。皇帝整个人被撞得往前扑，嘴里发出又尖又短的呻吟，根本来不及压住声音。\n\n"啊……嗯啊……太快了……你……嗯……"\n\n他的指甲在你背上留下了几道红痕，双腿紧紧夹着你的腰，浑身颤抖不止。`,
+      `你不给他任何喘息的余地，一下比一下更猛烈地冲撞。皇帝的衣袍彻底散落，雪白的肌肤在阳光下泛着潮红。他咬着自己的手背，泪水从眼角滑落。\n\n"嗯……受不了了……你……轻些……不……别停……"`,
+    ],
+    tease:[
+      `你故意放慢速度，每一次都缓缓地退出，再慢慢地顶入。皇帝急得扭动腰身，试图迎合你的节奏，却被你按住了胯骨。\n\n"你……嗯……别折磨朕……快些……求你了……"\n\n他的声音带着哭腔，脸颊烧得通红，眼神迷离而渴求。`,
+      `你缓慢而深沉地研磨着他最敏感的地方，每一次都精准地碾过那个点。皇帝的身体像触电一样弹跳，嘴里发出支离破碎的呜咽。\n\n"你……嗯……你到底……要不要……嗯啊……"`,
+    ],
+    behind:[
+      `你将他翻过身去，让他趴在地上。从背后再次进入的瞬间，他整个人都软了下去，只靠着你的手臂才没有彻底趴倒。\n\n"嗯……这个姿势……好深……嗯啊……"\n\n他的脸埋在臂弯里，肩胛骨随着你的律动起伏。`,
+      `你将他翻了个身，他的膝盖跪在柔软的草地上，双手撑着前方。你从后方握住他的腰，重新贯穿。\n\n"啊……你……嗯……从后面……好满……"\n\n他的腰塌了下去，后背形成一道优美的弧线。`,
+    ],
+  };
+
+  let text=pick(actionTexts[action]||actionTexts.fierce);
+
+  emperor.favor=clamp(emperor.favor+rand(5,10),-100,100);
+  GS.player.experience+=rand(10,20);
+
+  // 射精选择
+  let usedHole=window._gardenSexHole||'back';
+  let canImpregnate=(usedHole==='front')||(usedHole==='back'&&emperor.gender==='male');
+  let willCreampie=isSaoLang||emperor.favor>=60;
+
+  let finishChoicesHtml;
+  if(canImpregnate&&!emperor.pregnant){
+    if(willCreampie){
+      finishChoicesHtml=`<button class="dialogue-choice-btn" onclick="gardenSexFinishFinal(true,'${nearbyCompanionId}')">全部射在里面</button><button class="dialogue-choice-btn" onclick="gardenSexFinishFinal(false,'${nearbyCompanionId}')">拔出来射在外面</button>`;
+    }else{
+      finishChoicesHtml=`<button class="dialogue-choice-btn" onclick="gardenSexFinishFinal(true,'${nearbyCompanionId}')">内射</button><button class="dialogue-choice-btn" onclick="gardenSexFinishFinal(false,'${nearbyCompanionId}')">外射</button>`;
+    }
+  }else{
+    finishChoicesHtml=`<button class="dialogue-choice-btn" onclick="gardenSexFinishFinal(false,'${nearbyCompanionId}')">释放</button>`;
+  }
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="text-align:center;margin-bottom:16px"><img src="${emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div>
+    <div class="dialogue-box"><div class="dialogue-speaker">御花园 · 春风一度</div>
+    <div class="dialogue-text" style="white-space:pre-line">${text}\n\n最后关头……</div>
+    <div class="dialogue-choices">${finishChoicesHtml}</div></div></div>`;
+}
+
+function gardenSexFinishFinal(creampie,nearbyCompanionId){
+  let emperor=GS.emperor;
+  let isSaoLang=emperor.personality==='骚浪';
+  let bdView=document.getElementById('bedchamber-view');
+  let usedHole=window._gardenSexHole||'back';
+  let canImpregnate=(usedHole==='front')||(usedHole==='back'&&emperor.gender==='male');
+
+  let resultText='';
+  if(creampie){
+    if(isSaoLang){
+      resultText=`皇帝紧紧缠住你，不让你退出。"全部……都给朕……射在里面……"\n\n你尽数灌入，他满足地长叹一声，浑身瘫软在你怀中。`;
+    }else{
+      resultText=`你在最后一刻深深挺入，将一切都留在了他体内。皇帝的身体剧烈颤抖了一下，随即软倒下去。`;
+    }
+    if(canImpregnate&&!emperor.pregnant){
+      if(Math.random()<0.3){
+        emperor.pregnant=true;emperor.pregnantMonth=0;emperor.pregnantFather='player';
+        resultText+='\n\n（此后不久，皇帝似有了身孕……）';
+        addNpcLog(emperor.id,'有孕（御花园野外所得）');
+      }
+    }
+  }else{
+    resultText=`你在最后关头退了出来，释放在他的腰背之上。皇帝喘着粗气，伸手抹了一把，皱了皱眉。\n\n"你弄脏朕的衣裳了……"`;
+  }
+
+  // 窥见剧情
+  let potentialWitness=window._gardenSexWitness;
+  let witnessText='';
+  if(potentialWitness&&potentialWitness.alive){
+    let discovered=Math.random()<0.5;
+    witnessText=`\n\n……不远处的花丛后面，${potentialWitness.surname}${potentialWitness.rank}无意间撞见了这一幕。`;
+    let witnessReactions=[
+      `瞪大了眼睛，捂住嘴巴，心脏几乎要跳出胸腔。可双腿却像被钉住了，怎么也迈不开步子……`,
+      `那双眼睛在花叶缝隙间瞪得浑圆，呼吸都不敢出。皇帝被操得浑身发颤的样子，每一声压抑的呻吟都像锤子砸在心头……`,
+      `花丛后的人僵在原地，大脑一片空白。九五之尊竟然……被人这样……`,
+    ];
+    witnessText+='\n\n'+pick(witnessReactions);
+    addNpcLog(potentialWitness.id,`在御花园暗处窥见皇帝被${GS.player.surname}${GS.player.rank}野外行事`);
+
+    if(discovered){
+      witnessText+=`\n\n然而脚下踩断了一根枯枝。清脆的声响在寂静中格外刺耳。皇帝猛地转过头来——`;
+      let isSaoLangOrFengLiu=(emperor.personality==='骚浪'||emperor.personality==='风流');
+      if(isSaoLangOrFengLiu){
+        witnessText+=`\n\n皇帝非但没有生气，反而勾起嘴角，朝那边招了招手。"既然都看见了……过来吧。"\n\n事后三人都得到了赏赐，皇帝严令守口如瓶。`;
+        potentialWitness.favor=clamp(potentialWitness.favor+10,-100,100);
+        potentialWitness.love=clamp((potentialWitness.love||0)+5,0,100);
+        potentialWitness.sexExperience=(potentialWitness.sexExperience||0)+1;
+        addSexRecord(potentialWitness.id,'emperor',`在御花园三人行（被皇帝拉入）`);
+        addNpcLog(potentialWitness.id,`在御花园被皇帝拉入三人行事`);
+        addMoney(0,rand(20,50));
+      }else{
+        witnessText+=`\n\n"你！"皇帝大怒。${potentialWitness.surname}${potentialWitness.rank}被降位一级，禁足三月。`;
+        let wIdx=getRankIndex(potentialWitness.rank);
+        if(wIdx<RANK_TABLE.length-1)potentialWitness.rank=RANK_TABLE[wIdx+1].rank;
+        potentialWitness.love=clamp((potentialWitness.love||0)-15,0,100);
+        potentialWitness.loveToEmperor=clamp((potentialWitness.loveToEmperor||0)-20,-100,100);
+        potentialWitness._confinedUntil={year:GS.date.year,month:GS.date.month+3};
+        if(potentialWitness._confinedUntil.month>12){potentialWitness._confinedUntil.year++;potentialWitness._confinedUntil.month-=12;}
+        addNpcLog(potentialWitness.id,`窥见皇帝在御花园被操，被发现，降位一级，禁足三月。`);
+      }
+    }else{
+      let isFriendly=potentialWitness.favor>=40||potentialWitness.isAlly;
+      let witnessAfterRoll=Math.random();
+      if(witnessAfterRoll<0.33){
+        witnessText+=`\n\n悄悄退走，面色如常。（无动于衷）`;
+      }else if(witnessAfterRoll<0.66){
+        potentialWitness.loveToEmperor=clamp((potentialWitness.loveToEmperor||0)-20,-100,100);
+        witnessText+=`\n\n悄然离去，对皇帝的崇敬之情碎了一地。（对皇帝好感-20）`;
+        addNpcLog(potentialWitness.id,`窥见皇帝在御花园的丑态，对皇帝幻想破灭。`);
+      }else if(!isFriendly){
+        potentialWitness.favor=clamp(potentialWitness.favor-20,-100,100);
+        witnessText+=`\n\n攥紧了拳头，心中涌起强烈的嫉妒。（对你好感-20）`;
+        addNpcLog(potentialWitness.id,`窥见皇帝与${GS.player.surname}${GS.player.rank}在御花园野合，心生嫉妒。`);
+      }else{
+        witnessText+=`\n\n红着脸悄悄溜走了，这件事烂在肚子里便是。`;
+      }
+    }
+  }
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="text-align:center;margin-bottom:16px"><img src="${emperor.avatar}" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy"></div>
+    <div class="dialogue-box"><div class="dialogue-speaker">御花园 · 春风一度</div>
+    <div class="dialogue-text" style="white-space:pre-line">${resultText}${witnessText}</div>
+    <div class="dialogue-choices"><button class="dialogue-choice-btn" onclick="gardenSexFinish()">整理衣冠</button></div></div></div>`;
+
+  window._gardenSexWitness=null;
+  window._gardenSexHole=null;
+}
+
+function gardenSexFinish(){
+  GS._gardenExplored=false;
+  GS._gardenEncountered=[];
+  GS._gardenEmperorPresent=false;
+  GS._gardenEmperorCompanion=null;
+  document.getElementById('bedchamber-view').style.display='none';
+  updateTopBar();
+  switchTab('palace');
 }
 
 // ==================== 内务府 ====================
@@ -3493,10 +4126,15 @@ function renderNeiWuFu(){
     html+=`<div style="margin-top:8px">`;
     GS.player.servants.forEach((s,idx)=>{
       let traitDesc=s.trait.desc||'无特殊说明';
+      let sFavor=s._favor||0;
+      let loyalText=sFavor>=80?'<span style="color:#d4af37;font-size:9px;margin-left:4px">忠心耿耿</span>':'';
       html+=`<div class="servant-card">
         <span style="color:#f5e6c8;font-size:11px">${s.name}（${s.type}）</span>
         <span class="trait-tag ${s.trait.color}" onclick="showToast('${traitDesc.replace(/'/g,"\\'")}（${s.trait.label||''}）')" style="cursor:pointer">${s.trait.displayName||s.trait.name}</span>
         <span style="font-size:9px;color:#d4af37;margin-left:4px">${s.trait.label||''}</span>
+        ${loyalText}
+        <span style="font-size:9px;color:#8b7355;margin-left:4px">好感:${sFavor}</span>
+        <button class="talent-action-btn" style="font-size:9px" onclick="rewardServant(${idx})">赏赐(5银)</button>
         <button class="talent-action-btn" style="margin-left:auto;background:rgba(180,40,40,0.6);font-size:9px" onclick="fireServant(${idx})">解雇</button>
       </div>`;
     });
@@ -3624,7 +4262,8 @@ function showNPCDetailReadonly(id){
 
   let showAll=isEmperor;
   html+=`<div class="npc-stat-grid">
-    <div class="npc-stat-item"><span class="npc-stat-label">年龄</span><span class="npc-stat-val">${npc.age}</span></div>
+    <div class="npc-stat-item"><span class="npc-stat-label">年龄</span><span class="npc-stat-val">${npc.age}岁</span></div>
+    <div class="npc-stat-item"><span class="npc-stat-label">寿元</span><span class="${npc.lifespanRevealed?'npc-stat-val':'npc-stat-hidden'}">${npc.lifespanRevealed?npc.lifespan:'???'}</span></div>
     <div class="npc-stat-item"><span class="npc-stat-label">性格</span><span class="${showAll||npc.discovered?.personality?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.personality?npc.personality:'???'}</span></div>
     <div class="npc-stat-item"><span class="npc-stat-label">魅力</span><span class="${showAll||npc.discovered?.charm?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.charm?npc.charm:'???'}</span></div>
     <div class="npc-stat-item"><span class="npc-stat-label">体质</span><span class="${showAll||npc.discovered?.constitution?'npc-stat-val':'npc-stat-hidden'}">${showAll||npc.discovered?.constitution?npc.constitution:'???'}</span></div>
@@ -3718,6 +4357,14 @@ function showNPCDetailReadonly(id){
     </div>`;
   }
   
+  // 复活按钮（仅已故且有复活丹时显示）
+  if(!npc.alive){
+    let hasRevivePill=(GS.specialItems||[]).find(si=>si.effect==='revive'&&si.count>0);
+    if(hasRevivePill){
+      html+=`<button class="modal-btn" style="background:rgba(76,175,80,0.7);border-color:rgba(76,175,80,0.5);margin-top:8px" onclick="reviveNPC('${npc.id}')">💊 使用复活丹复活</button>`;
+    }
+  }
+
   // 关系网
   if(!isEmperor&&!isED&&!isDoctor){
     let relations=[];
@@ -3950,6 +4597,28 @@ function fireServant(idx){
   if(!s)return;
   GS.player.servants.splice(idx,1);
   showToast(`${s.name}已被遣退。`);
+  visitLocation('neiwufu');
+}
+
+function rewardServant(idx){
+  let s=GS.player.servants[idx];if(!s)return;
+  if(totalSilver()<5){showToast('银钱不足（需5银）');return;}
+  addMoney(0,-5);updateTopBar();
+  if(!s._favor)s._favor=0;
+  let gain=rand(5,10);
+  s._favor=clamp(s._favor+gain,0,100);
+  let texts=[
+    `${s.name}接过赏银，感激涕零，连连叩谢。`,
+    `${s.name}双手捧着银子，眼眶微红："主子对奴才真好……"`,
+    `${s.name}收下赏赐，恭恭敬敬地行了个大礼。`,
+    `"多谢主子恩赏！"${s.name}喜不自胜。`,
+    `${s.name}将银子小心翼翼地收好，脸上满是感动。`,
+  ];
+  showToast(pick(texts)+`（好感+${gain}）`);
+  if(s._favor>=80&&!s._loyalNotified){
+    s._loyalNotified=true;
+    showToast(`${s.name}对你忠心耿耿，愿为你赴汤蹈火！`);
+  }
   visitLocation('neiwufu');
 }
 
@@ -4730,8 +5399,19 @@ function emperorSelectBedPartner(){
     window._cheatingTarget=null;
   }
 
+  // 概率多人侍寝（20%概率）
+  let isMulti=Math.random()<0.2&&candidates.length>=3;
+  let secondPartner=null;
+  if(isMulti){
+    let others=candidates.filter(c=>c.id!==selected.id);
+    if(others.length>0)secondPartner=pick(others);
+  }
+
   if(selected.id==='player'){
-    GS._bribeBonus=0;// 被选中后清除贿赂加成
+    GS._bribeBonus=0;
+    if(secondPartner&&secondPartner.id!=='player'){
+      return{selected:'player_multi',playerChance,selectedName:'你',secondId:secondPartner.id,secondName:secondPartner.surname+(secondPartner.rank||'')};
+    }
     return{selected:'player',playerChance,selectedName:'你'};
   }else{
     let npcBedPrefBonus=getEmperorPreferenceBonus(selected);
@@ -4812,14 +5492,13 @@ function advanceXun(){
     }
   });
 
-  // 皇帝性格偏好：每旬对所有活着的妃子微调圣宠
-  GS.concubines.forEach(c=>{
-    if(c.alive&&!c.inColdPalace){
-      applyEmperorPreferenceToNPC(c);
-    }
-  });
-  // 对玩家也应用
-  applyEmperorPreferenceToPlayer();
+  // 皇帝性格偏好：仅在皇帝与该妃子实际互动时才额外增减圣宠
+  // 此处不再每旬自动对所有人应用偏好加成
+  // 偏好加成仅在以下时机触发：
+  // 1. 侍寝时（emperorSelectBedPartner中已处理）
+  // 2. 玩家主动在皇帝宫殿互动时（emperorPalacePerformTalent等已处理）
+  // 3. 玩家在御花园与皇帝互动时（已处理）
+  // 不再对全体妃子每旬自动应用
 
   // NPC之间互动
   processNPCInteractions();
@@ -4842,7 +5521,9 @@ function advanceXun(){
   // 用户封号
   if(GS.emperor&&GS.emperor.favor>=80&&!GS.player.honorTitle){
     if(!GS._usedTitles)GS._usedTitles=[];
-    let available=TITLE_POOL.filter(t=>!GS._usedTitles.includes(t));
+    let livingTitles=new Set();
+    GS.concubines.filter(c=>c.alive&&c.honorTitle).forEach(c=>livingTitles.add(c.honorTitle));
+    let available=TITLE_POOL.filter(t=>!livingTitles.has(t));
     if(available.length>0){
       let title=pick(available);GS._usedTitles.push(title);
       GS.player.honorTitle=title;
@@ -4922,9 +5603,13 @@ function showPromotionPopup(name,oldRank,newRank){
 
 // 封号系统
 function grantTitle(npc){
-  if(npc.honorTitle)return;// 已有封号
+  if(npc.honorTitle)return;
   if(!GS._usedTitles)GS._usedTitles=[];
-  let available=TITLE_POOL.filter(t=>!GS._usedTitles.includes(t));
+  // 收集所有活人正在使用的封号
+  let livingTitles=new Set();
+  GS.concubines.filter(c=>c.alive&&c.honorTitle).forEach(c=>livingTitles.add(c.honorTitle));
+  if(GS.player.honorTitle)livingTitles.add(GS.player.honorTitle);
+  let available=TITLE_POOL.filter(t=>!livingTitles.has(t));
   if(available.length===0)return;
   let title=pick(available);
   GS._usedTitles.push(title);
@@ -5456,6 +6141,11 @@ function showXunEndOverlay(){
 
   let btnAction='false';
   if(result&&result.selected==='player')btnAction='\'player\'';
+  else if(result&&result.selected==='player_multi'){
+    btnAction='\'player_multi\'';
+    GS._multiSecondId=result.secondId;
+    bedText=`皇帝今夜召你与${result.secondName}一同侍寝。\n你被选中的概率：${result.playerChance}%`;
+  }
   else if(result&&result.selected==='pregnant_scene')btnAction='\'pregnant_scene\'';
 
   content.innerHTML=`<div class="xun-end-text">${bedText}</div><button class="xun-end-btn" onclick="closeXunEndOverlay(${btnAction})">继 续</button>`;
@@ -5470,9 +6160,160 @@ function closeXunEndOverlay(sceneType){
   setTimeout(()=>{
     overlay.style.display='none';
     if(sceneType==='player'){triggerBedScene(GS.emperor,false);}
+    else if(sceneType==='player_multi'){triggerMultiBedScene();}
     else if(sceneType==='pregnant_scene'){triggerPregnantCompanionScene();}
     else{updateTopBar();switchTab('palace');}
   },800);
+}
+
+function triggerMultiBedScene(){
+  let secondNpc=findNPC(GS._multiSecondId);
+  if(!secondNpc){triggerBedScene(GS.emperor,false);return;}
+  let emperor=GS.emperor;
+
+  ['palace-view','map-view','personnel-view','settings-view','location-view'].forEach(vid=>{document.getElementById(vid).style.display='none';});
+  let bdView=document.getElementById('bedchamber-view');
+  bdView.style.backgroundImage=`url('https://res.cloudinary.com/dnezkz9ma/image/upload/v1776005128/pdbfpdqg912ppzqeuyw2.png')`;
+  bdView.style.display='block';
+
+  let secondHasDick=(secondNpc.gender==='male'||secondNpc.gender==='bisexual');
+  let secondHasHole=(secondNpc.gender==='female'||secondNpc.gender==='bisexual');
+  let emperorHasDick=(emperor.gender==='male'||emperor.gender==='bisexual');
+
+  // 记录
+  emperor.sexExperience=(emperor.sexExperience||0)+1;
+  GS.player.sexExperience=(GS.player.sexExperience||0)+1;
+  secondNpc.sexExperience=(secondNpc.sexExperience||0)+1;
+  addSexRecord(emperor.id,'player',`三人侍寝，被${GS.player.surname}${GS.player.rank}操，同时与${secondNpc.surname}${secondNpc.rank}行事`);
+  addSexRecord(secondNpc.id,'emperor',`三人侍寝，与皇帝和${GS.player.surname}${GS.player.rank}同榻`);
+  addNpcLog(emperor.id,`三人侍寝：${GS.player.surname}${GS.player.rank}与${secondNpc.surname}${secondNpc.rank}`);
+  addNpcLog(secondNpc.id,`三人侍寝：与皇帝和${GS.player.surname}${GS.player.rank}同榻`);
+  addNpcLog('player',`三人侍寝：操皇帝，${secondNpc.surname}${secondNpc.rank}在侧`);
+  takeVirginity(emperor,'back',GS.player.fullName);
+  let hasFP=secondNpc.traits?.find(t=>t.effect&&t.effect.foreignPower);
+  if(hasFP)secondNpc.love=Math.min(secondNpc.love,50);
+
+  // 分步互动式三人行
+  let openingText=`今夜，寝殿烛火摇曳。皇帝与${secondNpc.surname}${secondNpc.rank}都已在龙榻上等候。\n\n皇帝看了你一眼，又看了看身旁的${secondNpc.surname}${secondNpc.rank}，嘴角微微勾起。\n\n"今晚……朕想试试不一样的。"`;
+
+  let posChoices=[];
+  if(emperorHasDick&&secondHasHole){
+    posChoices=[
+      {text:`将皇帝按成跪趴，你从后面操他，让他的鸡巴同时插入${secondNpc.surname}${secondNpc.rank}`,posId:'sandwich_front'},
+      {text:`坐在榻边，让皇帝骑坐在你身上，${secondNpc.surname}${secondNpc.rank}坐在皇帝身上`,posId:'triple_stack'},
+      {text:`让皇帝仰躺，你操他的同时，${secondNpc.surname}${secondNpc.rank}跪在旁边伺候`,posId:'side_service'},
+    ];
+  }else if(emperorHasDick&&secondHasDick){
+    posChoices=[
+      {text:`让皇帝跪趴，你从后面操他，${secondNpc.surname}${secondNpc.rank}在前面让皇帝含着`,posId:'spit_roast'},
+      {text:`从后面抱着皇帝操，让皇帝用手伺候${secondNpc.surname}${secondNpc.rank}`,posId:'handjob_combo'},
+      {text:`让皇帝仰躺，你和${secondNpc.surname}${secondNpc.rank}一左一右伺候他，再轮流操他`,posId:'take_turns'},
+    ];
+  }else{
+    posChoices=[
+      {text:`你从后方操皇帝，皇帝的手探入${secondNpc.surname}${secondNpc.rank}衣裙之下`,posId:'generic_three'},
+      {text:`让皇帝跪在中间，你和${secondNpc.surname}${secondNpc.rank}从两侧夹住他`,posId:'squeeze'},
+    ];
+  }
+
+  let choicesHtml=posChoices.map(c=>`<button class="dialogue-choice-btn" onclick="multiSexStep2('${c.posId}','${secondNpc.id}')">${c.text}</button>`).join('');
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="display:flex;justify-content:center;gap:12px;margin-bottom:16px">
+      <img src="${emperor.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy">
+      <img src="${secondNpc.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(180,150,100,0.4);object-fit:cover" loading="lazy">
+    </div>
+    <div class="dialogue-box"><div class="dialogue-speaker">三人侍寝</div>
+    <div class="dialogue-text" style="white-space:pre-line">${openingText}</div>
+    <div class="dialogue-text" style="font-style:italic;color:#c9a96e;margin:8px 0">你打算怎么安排今晚的姿势？</div>
+    <div class="dialogue-choices">${choicesHtml}</div></div></div>`;
+}
+
+function multiSexStep2(posId,secondId){
+  let emperor=GS.emperor;
+  let secondNpc=findNPC(secondId);if(!secondNpc)return;
+  let bdView=document.getElementById('bedchamber-view');
+
+  let sceneText='';
+  let secondHasDick=(secondNpc.gender==='male'||secondNpc.gender==='bisexual');
+  let secondHasHole=(secondNpc.gender==='female'||secondNpc.gender==='bisexual');
+  let emperorHasDick=(emperor.gender==='male'||emperor.gender==='bisexual');
+
+  if(posId==='sandwich_front'){
+    sceneText=`你将皇帝按成跪趴的姿势，从后方握住他的腰缓缓挺入。皇帝闷哼一声，身体往前耸动——他的鸡巴正好顶入了跪在前方的${secondNpc.surname}${secondNpc.rank}体内。\n\n"嗯啊……你……慢些……朕前面也含着呢……"\n\n${secondNpc.surname}${secondNpc.rank}咬着枕角，承受着皇帝随你律动传来的冲撞。`;
+  }else if(posId==='triple_stack'){
+    sceneText=`你坐在龙榻边缘，皇帝面朝你骑坐在你身上，双腿缠着你的腰。而${secondNpc.surname}${secondNpc.rank}则面对着皇帝，被他拉着坐在了他的鸡巴上。\n\n三个人叠在一起。\n\n"嗯……你在下面顶朕……朕在前面……嗯啊……这种感觉……"\n\n皇帝的声音断断续续，被你从下方的冲撞顶碎。`;
+  }else if(posId==='side_service'){
+    sceneText=`皇帝仰面躺在龙榻上，你跪在他双腿之间将他的腿架在肩上，缓缓挺入。而${secondNpc.surname}${secondNpc.rank}则跪在皇帝身侧，用嘴和手伺候着他。\n\n"唔……嗯……两个人一起……朕……受不了……"`;
+  }else if(posId==='spit_roast'){
+    sceneText=`皇帝跪趴在龙榻中央，你从后方进入他。${secondNpc.surname}${secondNpc.rank}跪在皇帝面前，皇帝张嘴含住了对方的鸡巴。\n\n"唔……嗯嗯……"\n\n你每挺动一次，皇帝的身体就往前耸，将${secondNpc.surname}${secondNpc.rank}的鸡巴吞得更深。`;
+  }else if(posId==='handjob_combo'){
+    sceneText=`你从后面抱着皇帝，鸡巴深深埋在他体内。皇帝双腿大张，一手握住${secondNpc.surname}${secondNpc.rank}的鸡巴上下撸动。\n\n"过来……让朕也尝尝你的……嗯……"\n\n三个人的喘息此起彼伏。`;
+  }else if(posId==='take_turns'){
+    sceneText=`皇帝仰躺在龙榻上，你和${secondNpc.surname}${secondNpc.rank}一左一右俯在他身上。你先进入他，操了一阵之后退出来，换${secondNpc.surname}${secondNpc.rank}上前。\n\n皇帝喘着粗气："你们……嗯……轮着来也行……别停就好……"`;
+  }else{
+    sceneText=`你从后方操着皇帝，皇帝的手探入了身旁${secondNpc.surname}${secondNpc.rank}的衣裙之下。三个人纠缠在一起。`;
+  }
+
+  let nextChoices=[
+    {text:'加快节奏，猛烈冲刺',action:'intense'},
+    {text:'放慢速度，细细研磨',action:'slow'},
+    {text:'变换姿势，翻个个儿',action:'switch'},
+  ];
+  let choicesHtml=nextChoices.map(c=>`<button class="dialogue-choice-btn" onclick="multiSexStep3('${c.action}','${secondId}')">${c.text}</button>`).join('');
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="display:flex;justify-content:center;gap:12px;margin-bottom:16px">
+      <img src="${emperor.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy">
+      <img src="${secondNpc.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(180,150,100,0.4);object-fit:cover" loading="lazy">
+    </div>
+    <div class="dialogue-box"><div class="dialogue-speaker">三人侍寝</div>
+    <div class="dialogue-text" style="white-space:pre-line">${sceneText}</div>
+    <div class="dialogue-choices">${choicesHtml}</div></div></div>`;
+}
+
+function multiSexStep3(action,secondId){
+  let emperor=GS.emperor;
+  let secondNpc=findNPC(secondId);if(!secondNpc)return;
+  let bdView=document.getElementById('bedchamber-view');
+
+  let responseTexts={
+    intense:[
+      `你猛然加速，皇帝整个人被顶得往前扑倒，发出又尖又短的呻吟。${secondNpc.surname}${secondNpc.rank}也被连带着撞得浑身发颤。\n\n"啊……太快了……嗯啊……不要停……"\n\n寝殿里充斥着肉体碰撞的声响和三个人交错的喘息。`,
+      `你握紧皇帝的腰胯，每一下都顶到最深处。皇帝的脊背弯成一张弓，嘴里发出含混不清的呜咽。${secondNpc.surname}${secondNpc.rank}被这阵仗吓得瞪大了眼，却又忍不住攥紧了身下的锦被。`,
+    ],
+    slow:[
+      `你刻意放慢了速度，每一次进出都缓慢而深沉。皇帝的身体跟着你的节奏微微起伏，呼吸变得又长又重。\n\n"你……嗯……故意折磨朕……是不是……"\n\n${secondNpc.surname}${secondNpc.rank}在一旁看得面红耳赤，不知该把目光往哪里放。`,
+      `你温吞地律动着，每一下都研磨着最敏感的地方。皇帝咬着下唇，额上渗出细密的汗珠，手指无意识地攥紧了${secondNpc.surname}${secondNpc.rank}的手腕。`,
+    ],
+    switch:[
+      `你将皇帝翻了个身，让他仰面朝上。他愣了一瞬，随即被你重新贯穿，仰起脖颈发出一声长长的喟叹。${secondNpc.surname}${secondNpc.rank}趁机凑上前，在皇帝胸口落下细碎的吻。\n\n"你们两个……嗯……联手欺负朕……"`,
+      `你退出来，将皇帝拉起，让他趴在${secondNpc.surname}${secondNpc.rank}身上。然后从后方再次进入。这个姿势让皇帝和${secondNpc.surname}${secondNpc.rank}面对面贴在一起，呼吸交缠。\n\n"嗯……这样……好近……"`,
+    ],
+  };
+
+  let text=pick(responseTexts[action]||responseTexts.intense);
+
+  emperor.favor=clamp(emperor.favor+rand(5,12),-100,100);
+  secondNpc.love=clamp((secondNpc.love||0)+rand(3,8),0,100);
+  GS.player.experience+=rand(15,30);
+
+  let finishText=`\n\n……淫乱一夜之后，天光微亮。皇帝慵懒地倚在枕上，吩咐宫人给${secondNpc.surname}${secondNpc.rank}送去一碗避子汤。\n\n"朕分不清昨夜……你有没有碰朕的人。为了皇室血脉，这碗药，必须喝。"`;
+
+  bdView.innerHTML=`<div class="bedchamber-overlay"></div><div class="bedchamber-content">
+    <div style="display:flex;justify-content:center;gap:12px;margin-bottom:16px">
+      <img src="${emperor.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(212,175,55,0.5);object-fit:cover" loading="lazy">
+      <img src="${secondNpc.avatar}" style="width:50px;height:50px;border-radius:50%;border:2px solid rgba(180,150,100,0.4);object-fit:cover" loading="lazy">
+    </div>
+    <div class="dialogue-box"><div class="dialogue-speaker">三人侍寝</div>
+    <div class="dialogue-text" style="white-space:pre-line">${text}${finishText}</div>
+    <div class="dialogue-choices"><button class="dialogue-choice-btn" onclick="multiSexFinish()">天明离去</button></div></div></div>`;
+}
+
+function multiSexFinish(){
+  GS._multiSecondId=null;
+  document.getElementById('bedchamber-view').style.display='none';
+  updateTopBar();switchTab('palace');
 }
 
 function triggerPregnantCompanionScene(){
@@ -6003,8 +6844,90 @@ function renderSettings(){
     <div class="setting-item"><span class="setting-label">后宫互动频率</span><select class="setting-select" onchange="GS.settings.interactionFrequency=this.value"><option value="low" ${(s.interactionFrequency||'medium')==='low'?'selected':''}>低</option><option value="medium" ${(s.interactionFrequency||'medium')==='medium'?'selected':''}>中</option><option value="high" ${(s.interactionFrequency||'medium')==='high'?'selected':''}>高</option></select></div>
     <div class="setting-item"><span class="setting-label">允许妃子对食</span><div class="setting-toggle ${s.allowAffairs?'on':''}" onclick="toggleSetting('allowAffairs',this)"></div></div>
     <div style="font-size:9px;color:#8b7355;padding:0 0 4px 4px;margin-top:-4px">开启：允许后宫妃嫔相爱、偷情 ｜ 关闭：好感仅为友谊，不会发展恋情</div>
+
+    <div style="margin-top:16px;border-top:1px solid rgba(180,150,100,0.3);padding-top:12px">
+      <div style="font-size:13px;color:#5a3e28;margin-bottom:8px;letter-spacing:2px">兑 换 码</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <input class="form-input" id="redeem-code-input" placeholder="输入兑换码" style="max-width:180px;font-size:11px">
+        <button class="talent-action-btn" style="padding:5px 12px" onclick="redeemCode()">兑换</button>
+      </div>
+      <div style="font-size:10px;color:#8b7355;margin-bottom:6px">已兑换：${(GS.redeemedCodes||[]).length>0?(GS.redeemedCodes||[]).join('、'):'无'}</div>
+      <div style="font-size:11px;color:#6b4c30;margin-bottom:4px">✦ 特殊物品：</div>
+      <div class="inventory-grid" style="grid-template-columns:1fr 1fr 1fr">
+        ${(GS.specialItems||[]).length===0?'<div style="font-size:10px;color:#999;grid-column:1/-1;text-align:center">空空如也</div>':''}
+        ${(GS.specialItems||[]).map((item,idx)=>`<div class="inv-item ${item.color||'item-red'}"><div class="inv-item-name">${item.name}</div><div class="inv-item-desc">${item.desc||''}</div><div style="font-size:9px;color:#d4af37">×${item.count||1}</div>${item.type==='usable'?`<button class="talent-action-btn" style="margin-top:3px;font-size:9px" onclick="useSpecialItem(${idx})">使用</button>`:''}</div>`).join('')}
+      </div>
+    </div>
   </div>`;
   document.getElementById('settings-view').innerHTML=html;
+}
+
+const REDEEM_CODES={
+  'vip666':{
+    items:[
+      {name:'复活丹',desc:'可复活已故人物',type:'usable',color:'item-red',count:1,effect:'revive'},
+      {name:'学识丹',desc:'增加学识100（可送人或自用）',type:'usable',color:'item-purple',count:3,effect:'knowledge'},
+    ],
+    toast:'兑换成功！获得复活丹×1、学识丹×3'
+  },
+};
+
+function redeemCode(){
+  let input=document.getElementById('redeem-code-input');
+  if(!input)return;
+  let code=input.value.trim().toLowerCase();
+  if(!code){showToast('请输入兑换码');return;}
+  if(!GS.redeemedCodes)GS.redeemedCodes=[];
+  if(!GS.specialItems)GS.specialItems=[];
+  if(GS.redeemedCodes.includes(code)){showToast('此兑换码已在本存档中使用过');return;}
+  let codeData=REDEEM_CODES[code];
+  if(!codeData){showToast('无效的兑换码');return;}
+  GS.redeemedCodes.push(code);
+  codeData.items.forEach(item=>{
+    let existing=GS.specialItems.find(si=>si.name===item.name&&si.effect===item.effect);
+    if(existing){existing.count=(existing.count||1)+(item.count||1);}
+    else{GS.specialItems.push({...item});}
+  });
+  showToast(codeData.toast);
+  input.value='';
+  renderSettings();
+}
+
+function useSpecialItem(idx){
+  if(!GS.specialItems||!GS.specialItems[idx])return;
+  let item=GS.specialItems[idx];
+  if(item.effect==='revive'){
+    showToast('请在已故人物的详情页面使用复活丹');
+    return;
+  }
+  if(item.effect==='knowledge'){
+    let targets=[{id:'player',name:GS.player.fullName+'（自己）'}];
+    getAllNPCs().filter(n=>n.alive).forEach(n=>{targets.push({id:n.id,name:n.surname+(n.rank||n.fullName)});});
+    let html=`<div class="modal-title">使用「${item.name}」</div><button class="modal-close" onclick="closeModal()">✕</button>
+      <div class="modal-text" style="text-align:center;font-size:11px">选择目标，增加学识100。剩余：${item.count||1}个</div>`;
+    targets.forEach(t=>{
+      html+=`<button class="modal-btn" onclick="applyKnowledgePill(${idx},'${t.id}')">${t.name}</button>`;
+    });
+    openModal(html);
+    return;
+  }
+}
+
+function applyKnowledgePill(idx,targetId){
+  let item=GS.specialItems[idx];
+  if(!item||item.count<=0){showToast('数量不足');closeModal();return;}
+  if(targetId==='player'){
+    GS.player.knowledge=clamp((GS.player.knowledge||0)+100,0,1000);
+    showToast(`你服下学识丹，学识增加100！`);
+  }else{
+    let npc=findNPC(targetId);
+    if(!npc){showToast('目标不存在');closeModal();return;}
+    npc.knowledge=clamp((npc.knowledge||0)+100,0,1000);
+    showToast(`${npc.surname}${npc.rank||npc.fullName}服下学识丹，学识增加100！`);
+  }
+  item.count--;
+  if(item.count<=0)GS.specialItems.splice(idx,1);
+  closeModal();
 }
 
 function toggleSetting(key,el){GS.settings[key]=!GS.settings[key];el.classList.toggle('on');}
@@ -6019,6 +6942,37 @@ function showSaveModal(){
     html+=`<div class="save-slot" onclick="saveGame(${i})"><div class="save-slot-title">档位 ${i}</div><div class="save-slot-info">${info}</div></div>`;
   }
   openModal(html);
+}
+
+function reviveNPC(npcId){
+  let npc=findNPC(npcId);
+  if(!npc){showToast('目标不存在');return;}
+  if(npc.alive){showToast('此人尚在人世');return;}
+  let pillIdx=(GS.specialItems||[]).findIndex(si=>si.effect==='revive'&&si.count>0);
+  if(pillIdx<0){showToast('没有复活丹');return;}
+  openModal(`<div class="modal-title">复活确认</div><button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-text" style="text-align:center">
+      是否消耗一颗<span style="color:#f44336;font-weight:bold">复活丹</span>复活${npc.surname}${npc.rank||npc.fullName}？<br><br>
+      <span style="font-size:10px;color:#8b7355">复活后体质恢复至300，位份降为更衣。</span>
+    </div>
+    <button class="modal-btn" style="background:rgba(76,175,80,0.7)" onclick="confirmRevive('${npcId}',${pillIdx})">确认复活</button>
+    <button class="modal-btn" onclick="closeModal()">取消</button>`);
+}
+
+function confirmRevive(npcId,pillIdx){
+  let npc=findNPC(npcId);
+  if(!npc||npc.alive){showToast('无法复活');closeModal();return;}
+  let pill=GS.specialItems[pillIdx];
+  if(!pill||pill.count<=0){showToast('复活丹不足');closeModal();return;}
+  pill.count--;
+  if(pill.count<=0)GS.specialItems.splice(pillIdx,1);
+  npc.alive=true;
+  npc.constitution=300;
+  npc.inColdPalace=false;
+  if(npc.type==='concubine'){npc.rank='更衣';npc.experience=0;npc.expCap=getExpCapForRank('更衣');}
+  addNpcLog(npcId,`死而复生！（复活丹之效）降为更衣，重返后宫。`);
+  showToast(`${npc.surname}${npc.fullName}死而复生！`);
+  closeModal();
 }
 
 function showLoadModal(){
